@@ -1,0 +1,54 @@
+name: share-ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "未格式化的文件："
+            echo "$out"
+            exit 1
+          fi
+
+      - name: build
+        run: go build ./...
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test ./...
+
+      # share 的 go 指令必须 ≤ 两个消费方声明的最低版本，否则低版本一侧拉不动依赖。
+      - name: go-directive
+        run: |
+          max=1.25
+          got=$(grep -m1 '^go ' go.mod | awk '{print $2}')
+          newer=$(printf '%s\n%s\n' "$got" "$max" | sort -V | tail -1)
+          if [ "$newer" != "$max" ]; then
+            echo "share 的 go 指令 $got 高于上限 $max"
+            exit 1
+          fi
+
+      # 共享包只能依赖标准库与纯三方算法库，出现框架依赖说明边界被破坏。
+      - name: dependency-hygiene
+        run: |
+          banned='gin-gonic/gin|gorm.io/gorm|wailsapp/wails'
+          if go list -deps ./... | grep -E "$banned"; then
+            echo "share 不能依赖 gin / gorm / wails"
+            exit 1
+          fi

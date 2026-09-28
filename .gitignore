@@ -1,0 +1,3 @@
+# ===== 本地多模块联调（父目录 go.work，不入库）=====
+go.work
+go.work.sum
