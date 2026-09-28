@@ -2,6 +2,19 @@
 
 本库遵循[语义化版本](https://semver.org/lang/zh-CN/)：破坏性变更必须两个消费方（服务端 / 客户端）同步升级，库内不保留兼容分支。
 
+## [v0.2.0] - 2026-09-28
+
+### 新增
+
+- `postman`：Postman Collection v2.x ↔ 中立树。解析兼容 url 的字符串与 `{ raw }` 两种写法、过滤 disabled / 空名请求头、取 raw 请求体与首个响应样例；`Encode` 生成集合 JSON（含 schema、body options、响应样例）；`QueryPairs` 提取 URL 查询键值对。
+- `openapi`：OpenAPI 3.0 ↔ 中立文档。解析 info（title/version）与 paths（按路径与方法字典序展开的 `Operation`，含 summary / operationId / description / tags / parameters / responses 示例）；`Encode` 生成文档（方法转小写、响应缺省补 `200`）。
+
+### 变更
+
+- 两端改为直接引用共享内核，业务映射仍留各自仓库：
+  - 服务端：Postman / OpenAPI 的导入导出改调 `postman` / `openapi`，落库、分组复用、去重键、权限与操作日志仍留在 `service`；导入顺序由内核排序保证确定。
+  - 客户端：新增导入入口 `App.ImportCollection`（format：`postman` / `openapi`）与 `Collection.ImportPostman` / `Collection.ImportOpenAPI`，把中立结构映射为本地请求并落盘，按「方法 + 地址」跳过重复。
+
 ## [v0.1.0] - 2026-09-28
 
 首个版本，从服务端与客户端各自实现中抽出「两端必须一致」的规则与定义。

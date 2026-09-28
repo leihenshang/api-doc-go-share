@@ -14,6 +14,8 @@ API-DOC（Go 服务端 + Wails 桌面客户端）的**共享底层库**：只放
 | `varx` | 占位符语法、四级优先级（请求 > 项目当前环境 > 项目通用 > 全局）、敏感值掩码、内置动态变量（可注入取值器便于测试） | 服务端变量解析与导出；客户端环境变量替换 |
 | `collection` | 集合文件格式定义（Bruno OpenCollection 风格 yml：请求 / 分组 / 环境 / secret / 清单）+ YAML codec（未知字段 round-trip）+ 命名与排序规则 | 客户端集合读写；服务端 Bruno 导入 |
 | `mock` | Mock 匹配规则：URL 路径归一 + 方法优先 + 同路径首条兜底 | 服务端内置 Mock 服务；客户端本地 Mock |
+| `postman` | Postman Collection v2.x ↔ 中立树（目录 / 请求 / 请求头 / raw 请求体 / 响应样例）、`QueryPairs` | 服务端 Postman 导入导出；客户端 Postman 导入 |
+| `openapi` | OpenAPI 3.0 ↔ 中立文档（`Operation`：summary / operationId / tags / parameters / responses 示例） | 服务端 OpenAPI 导入导出；客户端 OpenAPI 导入 |
 
 **不包含**（按原则留在各自仓库）：文件 IO / 目录扫描、数据库与 ORM、gin / wails、真实网络发送、错误码契约（后续按需）。
 
@@ -72,6 +74,8 @@ codegen/     代码片段模板
 varx/        变量规则（占位符 / 优先级 / 掩码 / 内置）
 collection/  集合文件格式定义与 codec、命名与排序规则
 mock/        Mock 路径归一与匹配规则
+postman/     Postman Collection 中立树与解析/生成
+openapi/     OpenAPI 文档中立表示与解析/生成
 .doc/        设计与方案文档（共享模块方案.md 为完整方案与实施批次）
 ```
 
