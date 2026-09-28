@@ -76,7 +76,8 @@ collection/  集合文件格式定义与 codec、命名与排序规则
 mock/        Mock 路径归一与匹配规则
 postman/     Postman Collection 中立树与解析/生成
 openapi/     OpenAPI 文档中立表示与解析/生成
-.doc/        设计与方案文档（共享模块方案.md 为完整方案与实施批次）
+doc/         设计与方案文档（共享模块方案.md 为完整方案与实施批次）；
+             .doc/ 只放本地草稿，已在 .gitignore 中忽略
 ```
 
 ## 版本与变更
