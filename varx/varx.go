@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -153,6 +154,7 @@ func (b Builtins) Values() map[string]string {
 }
 
 // ResolveWithBuiltins 用给定的内置取值器渲染文本。
+// 支持嵌套变量（`{{a}}` 的值里可以再引用 `{{b}}`），有环时保留原文并记缺失。
 func ResolveWithBuiltins(text string, t *Table, b Builtins) (string, []string) {
 	if text == "" {
 		return "", nil
@@ -160,7 +162,19 @@ func ResolveWithBuiltins(text string, t *Table, b Builtins) (string, []string) {
 	r := &renderer{table: t, b: b, cache: map[string]string{}}
 	var missing []string
 	seen := map[string]struct{}{}
-	out := placeholderPattern.ReplaceAllStringFunc(text, func(m string) string {
+	out := r.expand(text, 0, &missing, seen)
+	return out, missing
+}
+
+// maxNestDepth 嵌套解析最大深度（防环）。
+const maxNestDepth = 8
+
+// expand 递归展开文本中的占位符；depth 用于防环，seen 用于 missing 去重。
+func (r *renderer) expand(text string, depth int, missing *[]string, seen map[string]struct{}) string {
+	if text == "" || depth > maxNestDepth {
+		return text
+	}
+	return placeholderPattern.ReplaceAllStringFunc(text, func(m string) string {
 		name := placeholderPattern.FindStringSubmatch(m)[1]
 		if name != "" && name[0] == '$' {
 			// 未知的内置名既不是变量也不算缺失（保留原文，UI 不做告警）。
@@ -173,13 +187,16 @@ func ResolveWithBuiltins(text string, t *Table, b Builtins) (string, []string) {
 		if !ok {
 			if _, dup := seen[name]; !dup {
 				seen[name] = struct{}{}
-				missing = append(missing, name)
+				*missing = append(*missing, name)
 			}
 			return m
 		}
+		// 嵌套展开：值里的 {{...}} 递归解析
+		if strings.Contains(v.Value, "{{") {
+			return r.expand(v.Value, depth+1, missing, seen)
+		}
 		return v.Value
 	})
-	return out, missing
 }
 
 // renderer 渲染上下文：缓存内置变量值，保证同一 Resolve 内同名的内置变量取同一个值。

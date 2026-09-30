@@ -132,3 +132,31 @@ func TestNames(t *testing.T) {
 func resolve(vars []Var, text string) (string, []string) {
 	return ResolveWithBuiltins(text, Build(vars, 0), fixedBuiltins())
 }
+
+// 嵌套变量：{{api}} 的值里引用 {{host}}，应递归展开。
+func TestNestedResolve(t *testing.T) {
+	tbl := Build([]Var{
+		{Name: "host", Value: "http://x.com", Scope: ScopeProjectCommon, Enabled: true},
+		{Name: "api", Value: "{{host}}/v1", Scope: ScopeProjectCommon, Enabled: true},
+		{Name: "deep", Value: "{{api}}/users", Scope: ScopeProjectCommon, Enabled: true},
+	}, 0)
+	got, missing := tbl.Resolve("{{deep}}")
+	if got != "http://x.com/v1/users" {
+		t.Fatalf("嵌套解析: got %q", got)
+	}
+	if len(missing) != 0 {
+		t.Fatalf("不应有缺失: %v", missing)
+	}
+}
+
+// 循环引用：a→b→a，有环时保留原文不 panic。
+func TestNestedResolveCycle(t *testing.T) {
+	tbl := Build([]Var{
+		{Name: "a", Value: "{{b}}", Scope: ScopeProjectCommon, Enabled: true},
+		{Name: "b", Value: "{{a}}", Scope: ScopeProjectCommon, Enabled: true},
+	}, 0)
+	got, _ := tbl.Resolve("{{a}}")
+	if got == "" {
+		t.Fatalf("循环引用不应返回空串")
+	}
+}
