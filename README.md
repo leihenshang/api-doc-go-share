@@ -2,7 +2,7 @@
 
 API-DOC（Go 服务端 + Wails 桌面客户端）的**共享底层库**：只放两端必须保持一致的「规则 / 算法 / 定义」，不放 IO、数据库、HTTP 框架与 UI。
 
-- 模块路径：`github.com/zqstudio/api-doc-go-share`
+- 模块路径：`github.com/leihenshang/api-doc-go-share`
 - Go 版本：`1.25`（取两个消费方的较低者；库内不使用更高版本的新特性）
 - 当前状态：本地联调（父目录 `go.work`），尚未发布远端
 
@@ -50,8 +50,8 @@ use (
 2. 消费方 `go.mod` 增加依赖，并配置私有仓库：
 
 ```bash
-go env -w GOPRIVATE=github.com/zqstudio/*
-go get github.com/zqstudio/api-doc-go-share@v0.1.0
+go env -w GOPRIVATE=github.com/leihenshang/*
+go get github.com/leihenshang/api-doc-go-share@v0.1.0
 ```
 
 不要提交相对路径 `replace`（远程 CI 会因路径不存在失败）。

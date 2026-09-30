@@ -1,4 +1,4 @@
-module github.com/zqstudio/api-doc-go-share
+module github.com/leihenshang/api-doc-go-share
 
 go 1.25
 
