@@ -48,7 +48,8 @@ type GRPCBlock struct {
 	Imports  []string `yaml:"imports,omitempty" json:"imports,omitempty"` // import 搜索目录（相对集合目录）
 	Metadata []KV     `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 	Message  string   `yaml:"message,omitempty" json:"message,omitempty"`
-	Stream   string   `yaml:"stream,omitempty" json:"stream,omitempty"` // unary | server | client | bidi
+	Stream   string   `yaml:"stream,omitempty" json:"stream,omitempty"`     // unary | server | client | bidi
+	Compress string   `yaml:"compress,omitempty" json:"compress,omitempty"` // 请求压缩：空/identity = 不压缩；gzip = 压缩
 	TLS      *GRPCTLS `yaml:"tls,omitempty" json:"tls,omitempty"`
 }
 

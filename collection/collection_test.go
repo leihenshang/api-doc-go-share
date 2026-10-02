@@ -189,3 +189,67 @@ func TestManifestCodec(t *testing.T) {
 		t.Fatalf("清单 round-trip 不符: %+v", back)
 	}
 }
+
+// grpc 段的新字段与服务端 / 客户端共享的 round-trip：compress（G7.5）。
+func TestGRPCBlockEncodeKeepsCompress(t *testing.T) {
+	f := &RequestFile{
+		Info: FileInfo{Name: "SayHello", Type: "grpc", Seq: 1},
+		Meta: FileMeta{UID: "u-1"},
+		GRPC: &GRPCBlock{
+			Target:   "localhost:50051",
+			Service:  "demo.Greeter",
+			Method:   "SayHello",
+			Proto:    "protos/greeter.proto",
+			Message:  `{"name":"alice"}`,
+			Stream:   "unary",
+			Compress: "gzip",
+			TLS:      &GRPCTLS{Mode: "tls", InsecureSkipVerify: true},
+		},
+		Docs: "",
+	}
+	data, err := f.Encode()
+	if err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	if !strings.Contains(string(data), "compress: gzip") {
+		t.Fatalf("grpc 段应写出 compress：\n%s", data)
+	}
+	if strings.Contains(string(data), "http:") {
+		t.Fatalf("gRPC 文件不应写出 http 段：\n%s", data)
+	}
+	back, err := DecodeRequest(data)
+	if err != nil {
+		t.Fatalf("DecodeRequest: %v", err)
+	}
+	if back.GRPC == nil || back.GRPC.Compress != "gzip" || back.GRPC.TLS == nil || !back.GRPC.TLS.InsecureSkipVerify {
+		t.Fatalf("grpc 段 round-trip 不符: %+v", back.GRPC)
+	}
+}
+
+// 清单里的集合级默认 gRPC 定义（P8）：配置一次，请求可回落使用。
+func TestManifestGRPCDefaultCodec(t *testing.T) {
+	m := &Manifest{}
+	m.Info.Name, m.Meta.UID = "demo", "uid-1"
+	m.GRPC = &GRPCDefault{Proto: "protos/greeter.proto", Imports: []string{"vendor/proto"}}
+	data, err := m.Encode("1.0.0")
+	if err != nil {
+		t.Fatalf("Encode manifest: %v", err)
+	}
+	back, err := DecodeManifest(data)
+	if err != nil {
+		t.Fatalf("DecodeManifest: %v", err)
+	}
+	if back.GRPC == nil || back.GRPC.Proto != "protos/greeter.proto" || len(back.GRPC.Imports) != 1 {
+		t.Fatalf("默认定义 round-trip 不符: %+v", back.GRPC)
+	}
+	// 未配置时不写出该段（旧清单不受影响）
+	plain := &Manifest{}
+	plain.Info.Name, plain.Meta.UID = "demo", "uid-2"
+	pdata, err := plain.Encode("1.0.0")
+	if err != nil {
+		t.Fatalf("Encode manifest: %v", err)
+	}
+	if strings.Contains(string(pdata), "grpc:") {
+		t.Fatalf("未配置默认定义时不应写出 grpc 段：\n%s", pdata)
+	}
+}

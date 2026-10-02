@@ -2,6 +2,18 @@
 
 本库遵循[语义化版本](https://semver.org/lang/zh-CN/)：破坏性变更必须两个消费方（服务端 / 客户端）同步升级，库内不保留兼容分支。
 
+## [v0.5.0] - 2026-10-02
+
+### 新增
+
+- `codegen`：`GrpcurlSnippet`（grpcurl 命令生成，客户端 G11.5）。中立入参 `GRPCRequest`（target / service / method / message / metadata / proto / imports / plaintext / insecure）；定义路径拆成 `-import-path <目录> -proto <文件名>`（定义所在目录自动进 import 路径且去重）；所有参数按 POSIX shell 单引号转义（`'` → `'\''`），路径统一正斜杠输出，`-plaintext` / `-insecure` 按连接安全设置二选一。
+- `collection`：`GRPCBlock.Compress`（`gzip` = 压缩请求体；空 / `identity` = 不压缩），供客户端「Options 分段」的压缩开关落盘（G7.5）。
+- `collection`：清单 `Manifest.GRPC`（`GRPCDefault{Proto, Imports}`）—— **集合级默认 gRPC 定义**（客户端 P8）：多个请求共享同一份定义时只配一次，请求自身没写 `proto` 就回落到它。
+
+### 变更
+
+- 无破坏性变更：`compress` 与清单 `grpc` 段都是**新增可选字段**，旧请求文件与未配置的清单行为完全不变（单测锁定「未配置默认定义时不写出 `grpc` 段」）。
+
 ## [v0.4.0] - 2026-10-02
 
 ### 新增

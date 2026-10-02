@@ -107,3 +107,60 @@ func TestSnippetUnknownLang(t *testing.T) {
 		t.Fatal("不支持的语言应返回错误")
 	}
 }
+
+// grpcurl 片段（G11.5）：明文、import 路径拆分、元数据、消息转义与位置参数。
+func TestGrpcurlSnippet(t *testing.T) {
+	got := GrpcurlSnippet(GRPCRequest{
+		Target:    "localhost:50051",
+		Service:   "demo.Greeter",
+		Method:    "SayHello",
+		Message:   `{"name":"alice"}`,
+		Metadata:  []KV{{Name: "x-token", Value: "t-123"}, {Name: "", Value: "ignored"}},
+		Proto:     "protos/greeter.proto",
+		Imports:   []string{"vendor/proto", "protos"},
+		Plaintext: true,
+	})
+	for _, want := range []string{
+		"grpcurl ",
+		"-plaintext",
+		"-import-path 'vendor/proto'",
+		"-import-path 'protos'",  // 定义所在目录去重后仍只在 import 路径里出现一次
+		"-proto 'greeter.proto'", // -proto 用文件名（相对 import 路径）
+		"-H 'x-token: t-123'",
+		`-d '{"name":"alice"}'`,
+		"'localhost:50051' 'demo.Greeter/SayHello'",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("grpcurl 片段缺少 %q：\n%s", want, got)
+		}
+	}
+	if strings.Count(got, "-import-path 'protos'") != 1 {
+		t.Errorf("定义目录应去重：\n%s", got)
+	}
+	if strings.Contains(got, "ignored") {
+		t.Errorf("空名元数据不应生成 -H：\n%s", got)
+	}
+}
+
+func TestGrpcurlSnippetTLSAndEscaping(t *testing.T) {
+	// TLS + 跳过校验 → -insecure（且不带 -plaintext）
+	got := GrpcurlSnippet(GRPCRequest{Target: "h:443", Service: "s.M", Method: "F", Proto: "greeter.proto", Insecure: true})
+	if strings.Contains(got, "-plaintext") || !strings.Contains(got, "-insecure") {
+		t.Errorf("TLS 片段应带 -insecure：\n%s", got)
+	}
+	// 无目录的定义：不生成 -import-path，-proto 直接用文件名
+	if strings.Contains(got, "-import-path") {
+		t.Errorf("无目录定义不应生成 -import-path：\n%s", got)
+	}
+
+	// 单引号按 shell 规则转义（' → '\''）
+	quoted := GrpcurlSnippet(GRPCRequest{Target: "h:1", Service: "s.M", Method: "F", Message: `{"a":"it's"}`, Plaintext: true})
+	if !strings.Contains(quoted, `it'\''s`) {
+		t.Errorf("消息里的单引号应按 shell 规则转义：\n%s", quoted)
+	}
+	// Windows 风格路径统一成正斜杠
+	win := GrpcurlSnippet(GRPCRequest{Target: "h:1", Service: "s.M", Method: "F", Proto: `protos\demo\greeter.proto`})
+	if !strings.Contains(win, "-import-path 'protos/demo'") || !strings.Contains(win, "-proto 'greeter.proto'") {
+		t.Errorf("路径应统一成斜杠：\n%s", win)
+	}
+}

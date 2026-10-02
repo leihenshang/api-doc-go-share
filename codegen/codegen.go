@@ -171,3 +171,106 @@ func quote(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	return strings.ReplaceAll(s, "'", "\\'")
 }
+
+// GRPCRequest grpcurl 生成的中立入参（gRPC 专用，字段均已按调用方规则渲染完毕）。
+type GRPCRequest struct {
+	Target  string // 服务地址 host:port
+	Service string // 完整服务名，如 demo.Greeter
+	Method  string // 方法名，如 SayHello
+	Message string // 请求消息（protojson 原文；空 = 不带 -d）
+	// Metadata 元数据行（顺序即生成顺序）
+	Metadata []KV
+	// Proto 入口定义（相对集合目录，如 protos/greeter.proto）；空 = 不带 -proto
+	Proto string
+	// Imports import 搜索目录（相对集合目录或绝对路径）
+	Imports []string
+	// Plaintext 明文连接（-plaintext）；TLS 下为 false
+	Plaintext bool
+	// Insecure TLS 且跳过证书校验（-insecure）
+	Insecure bool
+}
+
+// GrpcurlSnippet 生成可直接执行的 grpcurl 命令。
+//
+// 约定：定义路径拆成「-import-path <目录> -proto <文件名>」（grpcurl 的 -proto 相对 import 路径），
+// Proto 所在目录也会自动进 import 路径；所有参数一律单引号包裹，单引号按 shell 规则转义。
+func GrpcurlSnippet(r GRPCRequest) string {
+	parts := make([]string, 0, 8)
+	switch {
+	case r.Plaintext:
+		parts = append(parts, "-plaintext")
+	case r.Insecure:
+		parts = append(parts, "-insecure")
+	}
+	paths := cleanPaths(r.Imports)
+	if dir := protoDir(r.Proto); dir != "" && !containsPath(paths, dir) {
+		paths = append(paths, dir)
+	}
+	for _, p := range paths {
+		parts = append(parts, "-import-path "+shellQuote(p))
+	}
+	if name := protoBase(r.Proto); name != "" {
+		parts = append(parts, "-proto "+shellQuote(name))
+	}
+	for _, kv := range r.Metadata {
+		if strings.TrimSpace(kv.Name) == "" {
+			continue
+		}
+		parts = append(parts, "-H "+shellQuote(kv.Name+": "+kv.Value))
+	}
+	if strings.TrimSpace(r.Message) != "" {
+		parts = append(parts, "-d "+shellQuote(r.Message))
+	}
+	// 位置参数：目标地址 + 服务/方法（同一行的两个参数，便于整行替换）
+	positional := shellQuote(strings.TrimSpace(r.Target))
+	if r.Service != "" {
+		positional += " " + shellQuote(r.Service+"/"+r.Method)
+	}
+	parts = append(parts, positional)
+	return "grpcurl " + strings.Join(parts, " \\\n  ")
+}
+
+// protoDir 取定义文件的目录（无目录时返回空）。
+func protoDir(rel string) string {
+	rel = strings.TrimSpace(strings.ReplaceAll(rel, "\\", "/"))
+	if i := strings.LastIndex(rel, "/"); i > 0 {
+		return rel[:i]
+	}
+	return ""
+}
+
+// protoBase 取定义文件名。
+func protoBase(rel string) string {
+	rel = strings.TrimSpace(strings.ReplaceAll(rel, "\\", "/"))
+	if i := strings.LastIndex(rel, "/"); i >= 0 {
+		return rel[i+1:]
+	}
+	return rel
+}
+
+// shellQuote 单引号包裹（POSIX shell）：内部单引号按 '\” 拆分。
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// cleanPaths 去空白与重复（保持顺序）。
+func cleanPaths(list []string) []string {
+	out := make([]string, 0, len(list))
+	for _, p := range list {
+		p = strings.TrimSpace(strings.ReplaceAll(p, "\\", "/"))
+		if p == "" || containsPath(out, p) {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+func containsPath(list []string, p string) bool {
+	for _, item := range list {
+		if item == p {
+			return true
+		}
+	}
+	return false
+}

@@ -60,6 +60,15 @@ type Manifest struct {
 	Meta struct {
 		UID string `yaml:"uid"`
 	} `yaml:"meta"`
+	// GRPC 集合级默认 gRPC 定义：请求自身没写 proto 时回落到它（一次配置，多个请求共享）
+	GRPC *GRPCDefault `yaml:"grpc,omitempty"`
+}
+
+// GRPCDefault 集合级默认 gRPC 定义（清单里的 grpc 段）。
+// 只放「可被请求继承」的两项：定义文件与 import 搜索目录；服务与方法仍由每个请求自己写。
+type GRPCDefault struct {
+	Proto   string   `yaml:"proto,omitempty"`
+	Imports []string `yaml:"imports,omitempty"`
 }
 
 // DecodeManifest 解析集合清单。
