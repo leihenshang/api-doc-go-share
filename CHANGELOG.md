@@ -2,6 +2,17 @@
 
 本库遵循[语义化版本](https://semver.org/lang/zh-CN/)：破坏性变更必须两个消费方（服务端 / 客户端）同步升级，库内不保留兼容分支。
 
+## [v0.4.0] - 2026-10-02
+
+### 新增
+
+- `collection`：请求文件新增 `grpc` 段（`GRPCBlock`：`target` / `service` / `method` / `proto` / `imports` / `metadata` / `message` / `stream` / `tls`，另有 `GRPCTLS`：`mode` / `ca` / `cert` / `key` / `insecureSkipVerify`）。`RequestFile.GRPC` 以指针存在（非 nil 即 gRPC 请求），`RequestFile.Info.Type` 取值扩展为 `http` / `grpc`；`knownTopLevel` 同步加入 `grpc`，该段不再被收进 `Extra`。定义（`proto`）与 import 路径按约定相对集合目录，值支持 `{{变量}}`。
+
+### 变更
+
+- `collection`：`RequestFile.HTTP` 标签改为 `http,omitempty` 并新增 `HTTPBlock.IsZero()`（yaml.v3 认 `IsZeroer`）—— gRPC 请求文件不再写出空的 `http: {}` 段；`HTTP` 保持值类型，HTTP 请求文件的编码结果与既有读取方都不受影响。
+- 工程：移除 GitHub Actions 工作流（`.github/workflows/ci.yml`），校验改由各仓库门禁脚本承担。
+
 ## [v0.2.0] - 2026-09-28
 
 ### 新增

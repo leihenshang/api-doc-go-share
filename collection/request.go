@@ -29,12 +29,46 @@ type HTTPBlock struct {
 	Auth    *Auth  `yaml:"auth,omitempty"`
 }
 
+// IsZero 报告 http 段是否为空。配合 `yaml:"http,omitempty"` 让 gRPC 请求文件不带空的
+// `http: {}` 段（yaml.v3 对实现了 IsZeroer 的值类型字段同样支持 omitempty）。
+func (h HTTPBlock) IsZero() bool {
+	return h.Method == "" && h.URL == "" && len(h.Params) == 0 && len(h.Headers) == 0 &&
+		h.Body.Type == "" && h.Body.Raw == "" && h.Body.Data == "" && len(h.Body.Form) == 0 &&
+		h.Auth == nil
+}
+
+// GRPCBlock 请求文件的 grpc 段（gRPC 请求；字段设计见
+// api-doc-go-client/doc/客户端gRPC测试功能设计.md §2.1）。
+// 定义与 import 路径都相对集合目录；message 为 protojson 原文；值支持 {{变量}}。
+type GRPCBlock struct {
+	Target   string   `yaml:"target" json:"target"`                       // 服务地址 host:port
+	Service  string   `yaml:"service" json:"service"`                     // 完整服务名，如 demo.Greeter
+	Method   string   `yaml:"method" json:"method"`                       // 方法名，如 SayHello
+	Proto    string   `yaml:"proto,omitempty" json:"proto,omitempty"`     // 定义文件（相对集合目录）
+	Imports  []string `yaml:"imports,omitempty" json:"imports,omitempty"` // import 搜索目录（相对集合目录）
+	Metadata []KV     `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	Message  string   `yaml:"message,omitempty" json:"message,omitempty"`
+	Stream   string   `yaml:"stream,omitempty" json:"stream,omitempty"` // unary | server | client | bidi
+	TLS      *GRPCTLS `yaml:"tls,omitempty" json:"tls,omitempty"`
+}
+
+// GRPCTLS grpc 段的连接安全设置；Mode 为空/none 表示明文。
+type GRPCTLS struct {
+	Mode               string `yaml:"mode,omitempty" json:"mode,omitempty"`
+	CA                 string `yaml:"ca,omitempty" json:"ca,omitempty"`
+	Cert               string `yaml:"cert,omitempty" json:"cert,omitempty"`
+	Key                string `yaml:"key,omitempty" json:"key,omitempty"`
+	InsecureSkipVerify bool   `yaml:"insecureSkipVerify,omitempty" json:"insecureSkipVerify,omitempty"`
+}
+
 // RequestFile 一条接口在磁盘上的形态（对应集合里的一个 .yml 文件）。
 // Extra 保存未被识别的顶层字段，写回时必须带回去（Bruno 兼容）。
+// Info.Type 为 http / grpc：http 用 HTTP 段，grpc 用 GRPC 段，另一段为空并整体省略。
 type RequestFile struct {
 	Info     FileInfo         `yaml:"info"`
 	Meta     FileMeta         `yaml:"meta"`
-	HTTP     HTTPBlock        `yaml:"http"`
+	HTTP     HTTPBlock        `yaml:"http,omitempty"`
+	GRPC     *GRPCBlock       `yaml:"grpc,omitempty" json:"grpc,omitempty"`
 	Settings *RequestSettings `yaml:"settings,omitempty"`
 	Docs     string           `yaml:"docs"`
 	Extra    map[string]any   `yaml:"-"`
@@ -49,7 +83,7 @@ type FolderFile struct {
 }
 
 // knownTopLevel 已知的顶层字段；其余键按「未知字段」原样保留。
-var knownTopLevel = map[string]bool{"info": true, "meta": true, "http": true, "docs": true, "settings": true}
+var knownTopLevel = map[string]bool{"info": true, "meta": true, "http": true, "grpc": true, "docs": true, "settings": true}
 
 // UnmarshalYAML 解码请求文件并把未知顶层字段收进 Extra。
 func (f *RequestFile) UnmarshalYAML(node *yaml.Node) error {
