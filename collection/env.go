@@ -2,8 +2,11 @@ package collection
 
 import "gopkg.in/yaml.v3"
 
-// Var 环境变量；Secret 为真时值只存在 *.secrets.yml（本地明文，不进可提交文件）。
-type Var struct {
+// EnvVar 环境变量；Secret 为真时值只存在 *.secrets.yml（本地明文，不进可提交文件）。
+//
+// 命名避开 JS 保留字 var：Wails 反射本类型生成前端绑定时，名为 Var 的返回类型会与
+// JS 保留字冲突而被跳过（"Usage of reserved keyword found and not supported"）。
+type EnvVar struct {
 	Name    string `yaml:"name" json:"name"`
 	Value   string `yaml:"value" json:"value"`
 	Enabled bool   `yaml:"enabled" json:"enabled"`
@@ -15,7 +18,7 @@ type EnvFile struct {
 	Info struct {
 		Name string `yaml:"name"`
 	} `yaml:"info"`
-	Vars []Var `yaml:"vars"`
+	Vars []EnvVar `yaml:"vars"`
 }
 
 // SecretsFile 环境的 secret 值文件（ *.secrets.yml ）。

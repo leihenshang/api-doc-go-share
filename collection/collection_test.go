@@ -152,7 +152,7 @@ func TestNameRules(t *testing.T) {
 func TestEnvAndSecretsCodec(t *testing.T) {
 	f := &EnvFile{}
 	f.Info.Name = "dev"
-	f.Vars = []Var{{Name: "host", Value: "http://127.0.0.1", Enabled: true}, {Name: "token", Secret: true}}
+	f.Vars = []EnvVar{{Name: "host", Value: "http://127.0.0.1", Enabled: true}, {Name: "token", Secret: true}}
 	data, err := f.Encode()
 	if err != nil {
 		t.Fatalf("Encode env: %v", err)
