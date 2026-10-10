@@ -6,17 +6,37 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // invalidChars 文件名 / 条目名里的非法字符。
 var invalidChars = regexp.MustCompile(`[\\/:*?"<>|\x00-\x1f]`)
 
-// envNamePattern 环境名只能包含字母、数字、- 与 _（同时用于文件名，跨平台安全）。
-var envNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,60}$`)
+// envNameExtra 环境名允许的非字母数字字符：- _ ( ) .（含全角括号）
+const envNameExtra = "-_().（）"
+
+// envNameMaxLen 环境名长度上限（按 rune 计）
+const envNameMaxLen = 60
 
 // ValidEnvName 判断环境名是否合法。
+//
+// 环境名同时用作文件名（environments/<name>.yml），所以按白名单限制：
+// Unicode 字母 / 数字（中文、英文等皆可）+ `-_().（）`；空格、路径分隔符、
+// Windows 非法字符、控制字符一律拒绝。以 `.` 开头的名字也拒绝，
+// 避免生成隐藏文件或 `..` 这类指向上级目录的名字。
 func ValidEnvName(s string) bool {
-	return envNamePattern.MatchString(s)
+	if s == "" || len([]rune(s)) > envNameMaxLen || strings.HasPrefix(s, ".") {
+		return false
+	}
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			continue
+		}
+		if !strings.ContainsRune(envNameExtra, r) {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidEntryName 判断请求 / 分组名称是否可作为文件名（不含路径分隔符且非空）。

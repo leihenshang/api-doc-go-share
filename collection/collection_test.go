@@ -134,6 +134,17 @@ func TestNameRules(t *testing.T) {
 	if !ValidEnvName("dev") || !ValidEnvName("prod_2-1") || ValidEnvName("prod/x") || ValidEnvName("") {
 		t.Fatal("ValidEnvName 判定不符")
 	}
+	// 中文 / 括号 / 点号等常见字符应放行；路径分隔符、空格、Windows 非法字符与前导点拒绝
+	for _, ok := range []string{"测试环境", "预发(v2)", "预发（v2）", "dev.v1", "生产环境-华东"} {
+		if !ValidEnvName(ok) {
+			t.Fatalf("ValidEnvName(%q) 应为合法", ok)
+		}
+	}
+	for _, bad := range []string{"a b", "a\\b", "a:b", "a*b", ".hidden", "..", "a\tb"} {
+		if ValidEnvName(bad) {
+			t.Fatalf("ValidEnvName(%q) 应为非法", bad)
+		}
+	}
 	if !ValidEntryName("用户 列表") || ValidEntryName("a/b") || ValidEntryName("") {
 		t.Fatal("ValidEntryName 判定不符")
 	}
