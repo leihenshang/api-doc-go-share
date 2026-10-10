@@ -135,7 +135,7 @@ func TestNameRules(t *testing.T) {
 		t.Fatal("ValidEnvName 判定不符")
 	}
 	// 中文 / 括号 / 点号等常见字符应放行；路径分隔符、空格、Windows 非法字符与前导点拒绝
-	for _, ok := range []string{"测试环境", "预发(v2)", "预发（v2）", "dev.v1", "生产环境-华东"} {
+	for _, ok := range []string{"测试环境", "测试环境1", "预发(v2)", "预发（v2）", "dev.v1", "生产环境-华东"} {
 		if !ValidEnvName(ok) {
 			t.Fatalf("ValidEnvName(%q) 应为合法", ok)
 		}
