@@ -2,6 +2,13 @@
 
 本库遵循[语义化版本](https://semver.org/lang/zh-CN/)：破坏性变更必须两个消费方（服务端 / 客户端）同步升级，库内不保留兼容分支。
 
+## [v0.8.0] - 2026-10-15
+
+### 变更（破坏性）
+
+- `collection`：`RequestSettings.EncodeURL` 由 `bool` 改为 `*bool`，与同结构体的 `FollowRedirects` / `InsecureSSL` 三态口径统一——`nil` = 未设置（消费方回落默认「编码」），`true` = 对 URL 查询串/路径做百分号编码，`false` = 原样发送不编码。此前零值 `false` 会被误当成「显式关闭编码」，无法区分「没配」与「配了关」。`collection_test` 已同步。
+  - 消费方：客户端 `runner` 按 `*bool` 读取（`MergeOptions` 仅在非 nil 时覆盖，默认 `EncodeURL=true`，未配置行为与历史逐字节一致）；服务端不读取该字段。**客户端与服务端均需把 go.mod 升到 v0.8.0。**
+
 ## [v0.5.0] - 2026-10-02
 
 ### 新增
