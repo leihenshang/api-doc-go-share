@@ -4,7 +4,7 @@ API-DOC（Go 服务端 + Wails 桌面客户端）的**共享底层库**：只放
 
 - 模块路径：`github.com/leihenshang/api-doc-go-share`
 - Go 版本：`1.25`（取两个消费方的较低者；库内不使用更高版本的新特性）
-- 当前状态：已发布到 GitHub（公开仓库 [leihenshang/api-doc-go-share](https://github.com/leihenshang/api-doc-go-share)，当前 tag `v0.5.0`）；本地联调用父目录 `go.work`
+- 当前状态：已发布到 GitHub（公开仓库 [leihenshang/api-doc-go-share](https://github.com/leihenshang/api-doc-go-share)，当前 tag `v0.9.0`，版本历史见 [CHANGELOG.md](./CHANGELOG.md)）；本地联调用父目录 `go.work`
 
 ## 包含什么
 
@@ -64,7 +64,8 @@ go vet ./...
 go test ./...         # 纯单测：无 DB、无网络、无外部服务
 ```
 
-CI（`.github/workflows/ci.yml`）与上面命令同源，并额外校验 `go.mod` 的 `go` 指令 ≤ `1.25`。
+> 门禁说明：v0.4.0 起已移除 `.github/workflows/ci.yml`（本库改为发布前在消费方联调），
+> 上列命令即门禁内容，另需校验 `go.mod` 的 `go` 指令 ≤ `1.25`。
 
 ## 目录说明
 
