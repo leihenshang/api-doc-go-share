@@ -27,11 +27,13 @@ type KV struct {
 
 // Body 请求体：none / json / text / form（urlencoded）/ multipart。
 // Raw 为客户端的 json / text 原文，Data 为 Bruno 的 data 字段，两者都保留以免读写第三方集合时丢内容。
+// Descs 为 JSON 体「字段路径 → 备注」，由客户端表格视图维护，随同步往返。
 type Body struct {
-	Type string `yaml:"type" json:"type"`
-	Data string `yaml:"data,omitempty" json:"data,omitempty"`
-	Raw  string `yaml:"raw,omitempty" json:"raw"`
-	Form []KV   `yaml:"form,omitempty" json:"form"`
+	Type  string            `yaml:"type" json:"type"`
+	Data  string            `yaml:"data,omitempty" json:"data,omitempty"`
+	Raw   string            `yaml:"raw,omitempty" json:"raw"`
+	Form  []KV              `yaml:"form,omitempty" json:"form"`
+	Descs map[string]string `yaml:"descs,omitempty" json:"descs,omitempty"`
 }
 
 // Auth 认证配置：none | basic | bearer | apikey；值支持 {{变量}}。

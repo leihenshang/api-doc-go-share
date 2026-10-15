@@ -2,6 +2,13 @@
 
 本库遵循[语义化版本](https://semver.org/lang/zh-CN/)：破坏性变更必须两个消费方（服务端 / 客户端）同步升级，库内不保留兼容分支。
 
+## [v0.8.1] - 2026-10-15
+
+### 新增（向后兼容）
+
+- `collection`：`Body` 增加 `Descs map[string]string`（yaml/json `descs,omitempty`，`字段路径 → 备注`）。供客户端「请求体表格视图」维护 JSON 体各字段的备注，并作为同步 `bodyDescs` 键的真值源往返服务端。可选字段、`omitempty`，旧集合文件与读写方完全不受影响（无自定义 (un)marshal，随 `http.body` 自动落盘）。
+  - 消费方：客户端 `SyncExtra`/`ApplySyncExtra` 已接入该键；服务端以 `http_request_body_descs` 文本列存储、原样回传（不解释语义）。服务端不读取该字段，无需改代码。
+
 ## [v0.8.0] - 2026-10-15
 
 ### 变更（破坏性）
