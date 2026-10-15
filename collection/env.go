@@ -7,6 +7,8 @@ import "gopkg.in/yaml.v3"
 // 命名避开 JS 保留字 var：Wails 反射本类型生成前端绑定时，名为 Var 的返回类型会与
 // JS 保留字冲突而被跳过（"Usage of reserved keyword found and not supported"）。
 type EnvVar struct {
+	// UID 变量稳定身份（同步用 ext_uid）；旧文件缺省时由客户端首次同步补齐。
+	UID     string `yaml:"uid,omitempty" json:"uid,omitempty"`
 	Name    string `yaml:"name" json:"name"`
 	Value   string `yaml:"value" json:"value"`
 	Enabled bool   `yaml:"enabled" json:"enabled"`
@@ -18,6 +20,8 @@ type EnvFile struct {
 	Info struct {
 		Name string `yaml:"name"`
 	} `yaml:"info"`
+	// UID 环境稳定身份（同步用 ext_uid）；旧文件缺省时由客户端首次同步补齐。
+	UID  string   `yaml:"uid,omitempty" json:"uid,omitempty"`
 	Vars []EnvVar `yaml:"vars"`
 }
 
