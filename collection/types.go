@@ -10,7 +10,8 @@ type RequestSettings struct {
 	FollowRedirects *bool `yaml:"followRedirects,omitempty" json:"followRedirects,omitempty"`
 	MaxRedirects    int   `yaml:"maxRedirects,omitempty" json:"maxRedirects,omitempty"`
 	InsecureSSL     *bool `yaml:"insecureSsl,omitempty" json:"insecureSsl,omitempty"`
-	EncodeURL       bool  `yaml:"encodeUrl,omitempty" json:"encodeUrl,omitempty"`
+	// EncodeURL：nil（未设置）= 按默认「自动编码」发送；true = 显式编码；false = 不自动编码（参数原样拼进 query）。
+	EncodeURL *bool `yaml:"encodeUrl,omitempty" json:"encodeUrl,omitempty"`
 }
 
 // KV 请求参数 / 请求头 / 表单的一行。

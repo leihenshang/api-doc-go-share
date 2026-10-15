@@ -53,7 +53,7 @@ func TestDecodeRequest(t *testing.T) {
 	if f.HTTP.Auth == nil || f.HTTP.Auth.Type != "inherit" {
 		t.Fatalf("auth: inherit 未解析为标量: %+v", f.HTTP.Auth)
 	}
-	if f.Settings == nil || !f.Settings.EncodeURL || f.Settings.MaxRedirects != 5 || f.Settings.FollowRedirects == nil {
+	if f.Settings == nil || f.Settings.EncodeURL == nil || !*f.Settings.EncodeURL || f.Settings.MaxRedirects != 5 || f.Settings.FollowRedirects == nil {
 		t.Fatalf("settings 解析异常: %+v", f.Settings)
 	}
 	if len(f.HTTP.Params) != 1 || f.HTTP.Params[0].Value != "{{userName}}" {
