@@ -35,6 +35,20 @@ func TestResolveEmptyValueIsDefined(t *testing.T) {
 	}
 }
 
+// TestResolveDefaults G5 默认值语法 {{name:默认}}：已定义忽略默认；未定义取默认且不算缺失；
+// 未知内置名有默认同样兜底；无默认的维持旧行为（保留原文 + 记缺失 / 原样）。
+func TestResolveDefaults(t *testing.T) {
+	table := Build([]Var{{Name: "host", Value: "h1", Scope: ScopeProjectCommon, Enabled: true}}, 0)
+	got, missing := ResolveWithBuiltins(
+		"{{host:h2}}|{{port:8080}}|{{$unknown:fb}}|{{nobuf}}|{{host:}}", table, fixedBuiltins())
+	if want := "h1|8080|fb|{{nobuf}}|h1"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if len(missing) != 1 || missing[0] != "nobuf" {
+		t.Fatalf("missing=%v", missing)
+	}
+}
+
 // TestBuildPrecedence 四层优先级：请求 > 项目当前环境 > 项目通用 > 全局；其它环境的变量不参与。
 func TestBuildPrecedence(t *testing.T) {
 	vars := []Var{

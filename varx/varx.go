@@ -30,9 +30,10 @@ const (
 // MaskedValue 敏感值对外展示的掩码。
 const MaskedValue = "••••••"
 
-// placeholderPattern 匹配 {{name}} / {{$builtin}}；渲染阶段不对名字长度设限，
+// placeholderPattern 匹配 {{name}} / {{$builtin}}，并支持可选默认值段 {{name:默认值}}
+// （默认值不允许含花括号，避免与嵌套解析互相干扰）；渲染阶段不对名字长度设限，
 // 长度规则属于写入校验，由各端自己的变量名规则负责。
-var placeholderPattern = regexp.MustCompile(`\{\{\s*(\$?[A-Za-z_][A-Za-z0-9_]*)\s*\}\}`)
+var placeholderPattern = regexp.MustCompile(`\{\{\s*(\$?[A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^{}]*))?\s*\}\}`)
 
 // Var 一条变量的解析要素。
 type Var struct {
@@ -170,21 +171,30 @@ func ResolveWithBuiltins(text string, t *Table, b Builtins) (string, []string) {
 const maxNestDepth = 8
 
 // expand 递归展开文本中的占位符；depth 用于防环，seen 用于 missing 去重。
+// 支持可选默认值 {{name:默认值}}：名字解析不到时取默认值（不算缺失）；解析到则忽略默认值。
 func (r *renderer) expand(text string, depth int, missing *[]string, seen map[string]struct{}) string {
 	if text == "" || depth > maxNestDepth {
 		return text
 	}
 	return placeholderPattern.ReplaceAllStringFunc(text, func(m string) string {
-		name := placeholderPattern.FindStringSubmatch(m)[1]
+		sub := placeholderPattern.FindStringSubmatch(m)
+		name, def := sub[1], sub[2]
+		hasDef := strings.Contains(m, ":")
 		if name != "" && name[0] == '$' {
-			// 未知的内置名既不是变量也不算缺失（保留原文，UI 不做告警）。
+			// 未知的内置名既不是变量也不算缺失（有默认值则取默认，否则保留原文）。
 			if v, ok := r.builtin(name); ok {
 				return v
+			}
+			if hasDef {
+				return def
 			}
 			return m
 		}
 		v, ok := r.table.get(name)
 		if !ok {
+			if hasDef {
+				return def
+			}
 			if _, dup := seen[name]; !dup {
 				seen[name] = struct{}{}
 				*missing = append(*missing, name)
