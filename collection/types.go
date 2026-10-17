@@ -73,7 +73,7 @@ func (a Auth) MarshalYAML() (any, error) {
 
 // Node 集合树的节点。
 type Node struct {
-	Type     string  `json:"type"` // folder | request
+	Type     string  `json:"type"` // folder | request | doc（B19 起 doc 与 request 同级同目录混排）
 	UID      string  `json:"uid"`
 	Name     string  `json:"name"`
 	Path     string  `json:"path"`
