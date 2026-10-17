@@ -4,7 +4,7 @@ API-DOC（Go 服务端 + Wails 桌面客户端）的**共享底层库**：只放
 
 - 模块路径：`github.com/leihenshang/api-doc-go-share`
 - Go 版本：`1.25`（取两个消费方的较低者；库内不使用更高版本的新特性）
-- 当前状态：已发布到 GitHub（公开仓库 [leihenshang/api-doc-go-share](https://github.com/leihenshang/api-doc-go-share)，当前 tag `v0.9.0`，版本历史见 [CHANGELOG.md](./CHANGELOG.md)）；本地联调用父目录 `go.work`
+- 当前状态：已发布到 GitHub（公开仓库 [leihenshang/api-doc-go-share](https://github.com/leihenshang/api-doc-go-share)，当前 tag `v0.10.3`，版本历史见 [CHANGELOG.md](./CHANGELOG.md)）；本地联调用 `bash scripts/gowork.sh` 在父目录生成 `go.work`（P2-28），`--off` 取消
 
 ## 包含什么
 
