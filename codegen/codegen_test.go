@@ -193,3 +193,35 @@ func TestGrpcurlSnippetTLSAndEscaping(t *testing.T) {
 		t.Errorf("路径应统一成斜杠：\n%s", win)
 	}
 }
+
+// TestSnippetBodyNotDoubleSerialized fetch/axios 的 body 必须是字符串字面量：
+// 拼成 JSON.stringify(<原文>) 会把已序列化的 JSON 再序列化一次，
+// 而纯文本 body 会生成 JSON.stringify(hello) ⇒ 运行时 ReferenceError（S-05）。
+func TestSnippetBodyNotDoubleSerialized(t *testing.T) {
+	for _, lang := range []Lang{LangFetch, LangAxios} {
+		got, err := Snippet(lang, sample())
+		if err != nil {
+			t.Fatalf("Snippet(%s): %v", lang, err)
+		}
+		if strings.Contains(got, "JSON.stringify(") {
+			t.Fatalf("%s 片段不应二次序列化 body:\n%s", lang, got)
+		}
+		// 单引号字符串里双引号无需转义：body 逐字节保留原文。
+		if !strings.Contains(got, `body: '{"name":"alice"}'`) && !strings.Contains(got, `data: '{"name":"alice"}'`) {
+			t.Fatalf("%s 片段的 body 应为字符串字面量:\n%s", lang, got)
+		}
+	}
+
+	// 纯文本 body 同样不能变成裸标识符。
+	plain := sample()
+	plain.Body = `hello "world"`
+	for _, lang := range []Lang{LangFetch, LangAxios} {
+		got, err := Snippet(lang, plain)
+		if err != nil {
+			t.Fatalf("Snippet(%s plain): %v", lang, err)
+		}
+		if !strings.Contains(got, `'hello "world"'`) {
+			t.Fatalf("%s 片段的纯文本 body 应被引用:\n%s", lang, got)
+		}
+	}
+}

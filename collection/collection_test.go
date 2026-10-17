@@ -148,6 +148,12 @@ func TestNameRules(t *testing.T) {
 	if !ValidEntryName("用户 列表") || ValidEntryName("a/b") || ValidEntryName("") {
 		t.Fatal("ValidEntryName 判定不符")
 	}
+	// 点开头/点结尾会生成隐藏条目或指向上级目录（S-09）。
+	for _, bad := range []string{".", "..", ".git", ".hidden", "name.", "   "} {
+		if ValidEntryName(bad) {
+			t.Fatalf("ValidEntryName(%q) 应为非法", bad)
+		}
+	}
 	if got := SanitizeFileName(" a/b:c? "); got != "a-b-c-" {
 		t.Fatalf("SanitizeFileName = %q", got)
 	}

@@ -108,8 +108,11 @@ func fetchSnippet(method, url string, headers []KV, body string) string {
 		}
 		b.WriteString("\n  },")
 	}
+	// body 原样作为字符串字面量传：HTTP 请求体本来就是文本，拼成
+	// JSON.stringify(<原文>) 会把已经序列化好的 JSON 再序列化一次，
+	// 而非 JSON 文本（如 hello）会生成 JSON.stringify(hello) ⇒ 运行时 ReferenceError。
 	if body != "" {
-		fmt.Fprintf(&b, "\n  body: JSON.stringify(%s),", body)
+		fmt.Fprintf(&b, "\n  body: '%s',", quote(body))
 	}
 	b.WriteString("\n});\nconst data = await res.json();\nconsole.log(data);")
 	return b.String()
@@ -128,8 +131,9 @@ func axiosSnippet(method, url string, headers []KV, body string) string {
 		}
 		b.WriteString("\n  },")
 	}
+	// 与 fetch 同理：data 用字符串字面量，避免非 JSON 文本被当成标识符而 ReferenceError。
 	if body != "" {
-		fmt.Fprintf(&b, "\n  data: %s,", body)
+		fmt.Fprintf(&b, "\n  data: '%s',", quote(body))
 	}
 	b.WriteString("\n});\nconsole.log(data);")
 	return b.String()

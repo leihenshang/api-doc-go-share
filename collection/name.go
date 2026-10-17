@@ -40,8 +40,16 @@ func ValidEnvName(s string) bool {
 }
 
 // ValidEntryName 判断请求 / 分组名称是否可作为文件名（不含路径分隔符且非空）。
+//
+// 名称会被直接当作文件名或目录名使用，因此除了非法字符还要挡住「点开头/点结尾」：
+// `.`、`..` 会指向上级目录，`.git` 之类会生成隐藏条目或与工具目录撞名。
+// 口径与 ValidEnvName 保持一致，避免两处判定不一致。
 func ValidEntryName(s string) bool {
-	return s != "" && len([]rune(s)) <= 120 && !invalidChars.MatchString(s)
+	s = strings.TrimSpace(s)
+	if s == "" || len([]rune(s)) > 120 || invalidChars.MatchString(s) {
+		return false
+	}
+	return !strings.HasPrefix(s, ".") && !strings.HasSuffix(s, ".")
 }
 
 // SanitizeFileName 把名称转成安全的文件名（不含扩展名）。

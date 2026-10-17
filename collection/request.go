@@ -31,10 +31,13 @@ type HTTPBlock struct {
 
 // IsZero 报告 http 段是否为空。配合 `yaml:"http,omitempty"` 让 gRPC 请求文件不带空的
 // `http: {}` 段（yaml.v3 对实现了 IsZeroer 的值类型字段同样支持 omitempty）。
+//
+// 判空必须覆盖 Body 的全部字段：只填了 body.descs（字段备注）的请求块并不为空，
+// 漏判会让这个块被 omitempty 整段丢掉，用户的备注凭空消失。
 func (h HTTPBlock) IsZero() bool {
 	return h.Method == "" && h.URL == "" && len(h.Params) == 0 && len(h.Headers) == 0 &&
 		h.Body.Type == "" && h.Body.Raw == "" && h.Body.Data == "" && len(h.Body.Form) == 0 &&
-		h.Auth == nil
+		len(h.Body.Descs) == 0 && h.Auth == nil
 }
 
 // GRPCBlock 请求文件的 grpc 段（gRPC 请求；字段设计见

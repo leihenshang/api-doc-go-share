@@ -2,6 +2,15 @@
 
 本库遵循[语义化版本](https://semver.org/lang/zh-CN/)：破坏性变更必须两个消费方（服务端 / 客户端）同步升级，库内不保留兼容分支。
 
+## [v0.10.3] - 2026-10-17
+
+### 修复（向后兼容，行为修正）
+
+- `codegen`：`fetch` 与 `axios` 片段的请求体改为字符串字面量（走 `quote`）。此前 `fetch` 输出 `body: JSON.stringify(<原文>)`，对已经是 JSON 文本的 body 会**二次序列化**，而纯文本 body（如 `hello`）会生成 `JSON.stringify(hello)` ⇒ 粘贴运行即 `ReferenceError`；`axios` 的 `data: <原文>` 同样把纯文本当成裸标识符（S-05）。
+- `collection`：`ValidEntryName` 拒绝 `.` / `..` / 点开头与点结尾的名称。条目名会直接当文件名或目录名用，此前 `..` 能指向上级目录、`.git` 会与工具目录撞名，与 `ValidEnvName` 的口径也不一致（S-09）。
+- `collection`：`HTTPBlock.IsZero` 把 `Body.Descs` 计入判空。此前只填了字段备注的 `http` 段被判为空，被 `omitempty` 整段丢弃，用户的备注凭空消失（S-11）。
+  - 消费方：**代码无需改动**（`quote`/`ValidEntryName` 签名未变），服务端与客户端各自把 `go.mod` 升到 `v0.10.3` 即可。`codegen_test` 的 curl golden 不变，新增 fetch/axios body 用例。
+
 ## [v0.10.2] - 2026-10-17
 
 ### 修复（向后兼容，行为修正）
