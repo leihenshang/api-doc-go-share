@@ -67,16 +67,34 @@ func Snippet(l Lang, r Request) (string, error) {
 }
 
 // curlSnippet 生成可执行 cURL；输出格式与历史实现保持一致（回归点）。
+// 所有插值一律走 shell 引用：URL / 请求头 / 请求体都来自用户数据，
+// 直接拼进单引号会在遇到内嵌单引号时破坏引号配对，用户粘贴执行即被注入任意命令。
 func curlSnippet(method, url string, headers []KV, body string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "curl -X %s '%s'", method, url)
+	fmt.Fprintf(&b, "curl -X %s %s", shellToken(method), shellQuote(url))
 	for _, h := range headers {
-		fmt.Fprintf(&b, " \\\n  -H '%s: %s'", h.Name, h.Value)
+		fmt.Fprintf(&b, " \\\n  -H %s", shellQuote(h.Name+": "+h.Value))
 	}
 	if body != "" {
-		fmt.Fprintf(&b, " \\\n  -d '%s'", body)
+		fmt.Fprintf(&b, " \\\n  -d %s", shellQuote(body))
 	}
 	return b.String()
+}
+
+// shellToken 生成一个 shell 词：仅由字母/数字/下划线/短横线组成时原样输出（保持 `-X POST` 的常见形态），
+// 出现其它字符（含 ';' '|' '&' '$(' 空格等）则单引号包裹。
+func shellToken(s string) string {
+	if s == "" {
+		return "''"
+	}
+	for _, r := range s {
+		safe := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '_' || r == '-'
+		if !safe {
+			return shellQuote(s)
+		}
+	}
+	return s
 }
 
 // fetchSnippet 生成浏览器/Node 的 fetch 示例。

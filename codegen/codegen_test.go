@@ -96,9 +96,38 @@ func TestSnippetQuote(t *testing.T) {
 	if !strings.Contains(got, `'X-Q': 'a\'b\\c'`) {
 		t.Fatalf("fetch 片段应转义引号: %q", got)
 	}
-	// cURL 历史输出不做转义（回归基线），迁移时保持原样。
-	if curled, err := Snippet(LangCurl, r); err != nil || !strings.Contains(curled, `'X-Q: a'b\c'`) {
-		t.Fatalf("curl 片段保持不转义，got: %q err: %v", curled, err)
+	// cURL 输出直接粘进 shell 执行，内嵌单引号必须按 '\'' 拆分，
+	// 否则引号配对被打断，后面的内容会被 shell 当成新命令（S-01 命令注入）。
+	if curled, err := Snippet(LangCurl, r); err != nil || !strings.Contains(curled, `'X-Q: a'\''b\c'`) {
+		t.Fatalf("curl 片段应对单引号做 shell 转义，got: %q err: %v", curled, err)
+	}
+}
+
+// TestSnippetCurlNoShellInjection curl 片段的每一处插值都不得让用户数据逃出引号。
+func TestSnippetCurlNoShellInjection(t *testing.T) {
+	r := Request{
+		Method: "GET; touch /tmp/pwned",
+		URL:    "http://h/p?a=1'&touch /tmp/pwned2&x='",
+		Body:   `{"k":"v'$(id)"}`,
+	}
+	r.Headers = []KV{{Name: "X-Q", Value: "v'; touch /tmp/pwned3; echo '"}}
+
+	code, err := Snippet(LangCurl, r)
+	if err != nil {
+		t.Fatalf("Snippet(curl): %v", err)
+	}
+	// 每条命令分隔符都必须落在引号内：检查方法被整体引用（不以裸分号出现）
+	if strings.Contains(code, "-X GET; touch") {
+		t.Fatalf("HTTP 方法含元字符时必须加引号，got:\n%s", code)
+	}
+	if !strings.Contains(code, `-X 'GET; touch /tmp/pwned'`) {
+		t.Fatalf("HTTP 方法应被单引号整体包裹，got:\n%s", code)
+	}
+	// 每个用户来源的片段都应出现转义后的 '\'' 序列
+	for _, frag := range []string{"-H 'X-Q: v'\\''", "-d '{\"k\":\"v'\\''"} {
+		if !strings.Contains(code, frag) {
+			t.Fatalf("片段 %q 应做 shell 转义，got:\n%s", frag, code)
+		}
 	}
 }
 
