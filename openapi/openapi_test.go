@@ -73,6 +73,87 @@ func TestDecodeInvalid(t *testing.T) {
 	}
 }
 
+// TestDecodeSkipsNonMethodKeys Path Item 里的 summary / description / servers /
+// parameters / $ref / x-* 都不是操作，不能变成接口。
+func TestDecodeSkipsNonMethodKeys(t *testing.T) {
+	const doc = `{
+	  "info": { "title": "t", "version": "1" },
+	  "paths": {
+	    "/api/user": {
+	      "summary": "用户资源",
+	      "description": "整段说明",
+	      "servers": [{ "url": "https://api.example.com" }],
+	      "$ref": "#/components/pathItems/User",
+	      "x-internal": true,
+	      "parameters": [
+	        { "name": "tenant", "in": "header", "required": true }
+	      ],
+	      "get": { "summary": "查询用户" },
+	      "put": { "summary": "更新用户" }
+	    }
+	  }
+	}`
+	parsed, err := Decode([]byte(doc))
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if len(parsed.Ops) != 2 {
+		t.Fatalf("只应解析出 get/put 两个操作，got %d: %+v", len(parsed.Ops), parsed.Ops)
+	}
+	for _, op := range parsed.Ops {
+		if op.Method != "get" && op.Method != "put" {
+			t.Fatalf("出现了伪方法: %+v", op)
+		}
+		// path 级 parameters 应被各操作继承。
+		if len(op.Params) != 1 || op.Params[0].Name != "tenant" || !op.Params[0].Required {
+			t.Fatalf("%s 应继承 path 级参数，got %+v", op.Method, op.Params)
+		}
+	}
+}
+
+// TestDecodeOperationParamOverridesShared 操作级同名同 in 参数覆盖 path 级。
+func TestDecodeOperationParamOverridesShared(t *testing.T) {
+	const doc = `{
+	  "paths": {
+	    "/api/user": {
+	      "parameters": [
+	        { "name": "page", "in": "query", "description": "path 级" },
+	        { "name": "tenant", "in": "header" }
+	      ],
+	      "get": {
+	        "summary": "列表",
+	        "parameters": [{ "name": "page", "in": "query", "description": "操作级", "required": true }]
+	      }
+	    }
+	  }
+	}`
+	parsed, err := Decode([]byte(doc))
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	params := parsed.Ops[0].Params
+	if len(params) != 2 {
+		t.Fatalf("应合并为 2 个参数（page 覆盖、tenant 继承），got %+v", params)
+	}
+	if params[0].Name != "page" || params[0].Description != "操作级" || !params[0].Required {
+		t.Fatalf("操作级参数应覆盖 path 级，got %+v", params[0])
+	}
+	if params[1].Name != "tenant" {
+		t.Fatalf("共享参数应保留，got %+v", params[1])
+	}
+}
+
+// TestDecodeRejectsNonObjectOperation 方法体不是对象时报可定位错误，而不是静默吞掉。
+func TestDecodeRejectsNonObjectOperation(t *testing.T) {
+	_, err := Decode([]byte(`{"paths":{"/api/user":{"get":"TODO"}}}`))
+	if err == nil {
+		t.Fatal("方法体非对象应报错")
+	}
+	if !strings.Contains(err.Error(), "/api/user") || !strings.Contains(err.Error(), "get") {
+		t.Fatalf("错误信息应包含路径与方法，got %v", err)
+	}
+}
+
 func TestEncode(t *testing.T) {
 	doc := &Document{Title: "导出项目", Version: "2.0", Ops: []Operation{
 		{

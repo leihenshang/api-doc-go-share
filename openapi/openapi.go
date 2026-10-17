@@ -7,6 +7,7 @@ package openapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -53,6 +54,10 @@ type Response struct {
 }
 
 // Decode 解析 OpenAPI JSON；路径与方法按字典序展开，保证顺序确定。
+//
+// Path Item 下并非所有键都是操作：summary / description / servers / parameters /
+// $ref 以及 x-* 扩展也是合法键。只有下面这 8 个 HTTP 方法键才产出 Operation，
+// 否则一份带 path 级 summary 的文档会导出一堆方法名为 "summary" 的鬼接口。
 func Decode(data []byte) (*Document, error) {
 	var raw rawDocument
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -65,17 +70,47 @@ func Decode(data []byte) (*Document, error) {
 	}
 	sort.Strings(paths)
 	for _, p := range paths {
-		ops := raw.Paths[p]
-		methods := make([]string, 0, len(ops))
-		for m := range ops {
-			methods = append(methods, m)
-		}
-		sort.Strings(methods)
-		for _, m := range methods {
-			doc.Ops = append(doc.Ops, ops[m].toOperation(p, m))
+		item := raw.Paths[p]
+		shared := pathItemParams(item)
+		for _, m := range pathItemMethods(item) {
+			var op rawOperation
+			if err := json.Unmarshal(item[m], &op); err != nil {
+				// 方法体不是对象（例如手写的 "get": "TODO"）时给出可定位的错误，
+				// 而不是静默跳过整份文档里的这一个接口。
+				return nil, fmt.Errorf("paths[%s].%s: %w", p, m, err)
+			}
+			doc.Ops = append(doc.Ops, op.toOperation(p, m, shared))
 		}
 	}
 	return doc, nil
+}
+
+// httpMethods Path Item 下代表操作的合法键（OpenAPI 3 规范全集）。
+var httpMethods = []string{"delete", "get", "head", "options", "patch", "post", "put", "trace"}
+
+// pathItemMethods 返回该 Path Item 里实际存在的操作键，按字典序。
+func pathItemMethods(item map[string]json.RawMessage) []string {
+	out := make([]string, 0, len(httpMethods))
+	for _, m := range httpMethods {
+		if _, ok := item[m]; ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// pathItemParams 取 Path Item 级共享参数（可被同 name+in 的操作级参数覆盖）。
+// 该段写坏时按「无共享参数」处理：宁可少几条参数，也不该让整次导入失败。
+func pathItemParams(item map[string]json.RawMessage) []rawParam {
+	rawParams, ok := item["parameters"]
+	if !ok {
+		return nil
+	}
+	var out []rawParam
+	if err := json.Unmarshal(rawParams, &out); err != nil {
+		return nil
+	}
+	return out
 }
 
 // Encode 生成 OpenAPI 文档（路径 key 即接口地址，方法转小写）。
@@ -163,7 +198,9 @@ type rawDocument struct {
 		Title   string `json:"title"`
 		Version string `json:"version"`
 	} `json:"info"`
-	Paths map[string]map[string]rawOperation `json:"paths"`
+	// Paths 的值保留为原始 JSON：Path Item 的键集合混杂着方法、共享参数与扩展，
+	// 必须先按键名挑出真正的操作再解析（见 Decode）。
+	Paths map[string]map[string]json.RawMessage `json:"paths"`
 }
 
 type rawOperation struct {
@@ -190,7 +227,9 @@ type rawResponseBody struct {
 	} `json:"content"`
 }
 
-func (r rawOperation) toOperation(path, method string) Operation {
+// toOperation 合并 Path Item 级共享参数后生成中立操作。
+// 同名同 in 的参数以操作级为准（OpenAPI 规定操作级覆盖 path 级）。
+func (r rawOperation) toOperation(path, method string, shared []rawParam) Operation {
 	op := Operation{
 		Path:        path,
 		Method:      method,
@@ -199,7 +238,7 @@ func (r rawOperation) toOperation(path, method string) Operation {
 		Description: r.Description,
 		Tags:        r.Tags,
 	}
-	for _, p := range r.Parameters {
+	for _, p := range mergeParams(shared, r.Parameters) {
 		op.Params = append(op.Params, Param{
 			Name: p.Name, In: p.In, Description: p.Description,
 			Example: scalarText(p.Example), Required: p.Required,
@@ -240,4 +279,38 @@ func scalarText(raw json.RawMessage) string {
 		return s
 	}
 	return string(raw)
+}
+
+// mergeParams 合并 path 级与操作级参数：同名同 in 以操作级为准。
+// 顺序上保持 path 级的声明位置做「原位替换」，操作级独有的参数追加在后，
+// 这样导入后的参数表顺序与文档里的书写顺序一致。
+func mergeParams(shared, own []rawParam) []rawParam {
+	if len(shared) == 0 {
+		return own
+	}
+	key := func(p rawParam) string { return p.In + "\x00" + p.Name }
+	ownByKey := make(map[string]rawParam, len(own))
+	for _, p := range own {
+		ownByKey[key(p)] = p
+	}
+	out := make([]rawParam, 0, len(shared)+len(own))
+	used := make(map[string]struct{}, len(own))
+	for _, p := range shared {
+		k := key(p)
+		if replacement, ok := ownByKey[k]; ok {
+			out = append(out, replacement)
+			used[k] = struct{}{}
+			continue
+		}
+		out = append(out, p)
+	}
+	for _, p := range own {
+		k := key(p)
+		if _, done := used[k]; done {
+			continue
+		}
+		used[k] = struct{}{}
+		out = append(out, p)
+	}
+	return out
 }

@@ -40,6 +40,11 @@ func TestPath(t *testing.T) {
 		"https://api.example.com/v1/user/list?page=1#top": "/v1/user/list",
 		"http://a.com":  "/",
 		"/v1/user/list": "/v1/user/list",
+		// query / fragment 里带 "://" 时不能被当成 scheme 分隔符截断。
+		"/v1/jump?redirect=://evil": "/v1/jump",
+		"/v1/jump#://evil":          "/v1/jump",
+		// 路径中间出现 "://" 不是 scheme（scheme 之前不能有 "/"）。
+		"/v1/a/://b": "/v1/a/://b",
 	}
 	for in, want := range cases {
 		if got := Path(in); got != want {

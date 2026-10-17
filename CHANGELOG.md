@@ -2,6 +2,16 @@
 
 本库遵循[语义化版本](https://semver.org/lang/zh-CN/)：破坏性变更必须两个消费方（服务端 / 客户端）同步升级，库内不保留兼容分支。
 
+## [v0.10.2] - 2026-10-17
+
+### 修复（向后兼容，行为修正）
+
+- `openapi`：`Decode` 只把 Path Item 下的 8 个合法方法键（`get/put/post/delete/options/head/patch/trace`）当成操作。此前把整个 Path Item 的键集合都当方法展开，`summary` / `description` / `servers` / `parameters` / `$ref` / `x-*` 全被解析成操作，导入后生成一批方法名为 `SUMMARY`、`PARAMETERS` 的**幽灵接口**（S-02）。
+  - 同时补上规范要求但此前被丢掉的 **Path Item 级共享参数**：先按 path 级声明顺序继承，同名同 `in` 由操作级参数原位覆盖。
+  - 方法体不是对象（例如手写 `"get": "TODO"`）现在返回带 `paths[路径].方法` 的定位错误，而不是静默产出一个空操作。
+- `mock`：`Path` 先切 `?` / `#` 再识别 scheme。此前先找 `://`，像 `/v1/jump?redirect=://evil` 这类地址会被截成 `/`；现在只有出现在第一个 `/` 之前的 `://` 才算 scheme 分隔符（S-04）。
+  - 消费方：**代码无需改动**，服务端与客户端各自把 `go.mod` 升到 `v0.10.2` 即可。`openapi_test` / `mock_test` 已补守卫用例，原有 `TestDecode` / `TestRoundTrip` / `TestPath` 输出逐字节不变。
+
 ## [v0.10.1] - 2026-10-17
 
 ### 修复（向后兼容，行为修正）

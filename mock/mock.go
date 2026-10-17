@@ -15,16 +15,19 @@ type Api struct {
 // Path 取 URL 的路径部分：去掉 scheme、host、query 与 fragment。
 func Path(raw string) string {
 	u := strings.TrimSpace(raw)
-	if i := strings.Index(u, "://"); i >= 0 {
+	// 先切 query / fragment 再找 scheme：query 里完全可能出现 "://"
+	// （例如 ?redirect=://foo），先搜 "://" 会把地址截成错误的路径。
+	if i := strings.IndexAny(u, "?#"); i >= 0 {
+		u = u[:i]
+	}
+	// 只有出现在第一个 "/" 之前的 "://" 才是 scheme 分隔符。
+	if i := strings.Index(u, "://"); i > 0 && !strings.Contains(u[:i], "/") {
 		u = u[i+3:]
 		if j := strings.Index(u, "/"); j >= 0 {
 			u = u[j:]
 		} else {
 			u = "/"
 		}
-	}
-	if i := strings.IndexAny(u, "?#"); i >= 0 {
-		u = u[:i]
 	}
 	return u
 }
