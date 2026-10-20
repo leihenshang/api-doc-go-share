@@ -50,9 +50,13 @@ func Snippet(l Lang, r Request) (string, error) {
 	default:
 		return "", fmt.Errorf("codegen: 不支持的代码语言 %q", l)
 	}
-	if r.Method == "" {
-		r.Method = "GET"
+	// 审核 C-2：method 也是不可信输入（Postman/OpenAPI 导入原样透传），
+	// 在入口收敛成安全的 HTTP token 标识符，非法直接报错，杜绝片段的注入。
+	method, err := normalizeMethod(r.Method)
+	if err != nil {
+		return "", err
 	}
+	r.Method = method
 	switch l {
 	case LangFetch:
 		return fetchSnippet(r.Method, r.URL, r.Headers, r.Body), nil
@@ -64,6 +68,25 @@ func Snippet(l Lang, r Request) (string, error) {
 		return pythonSnippet(r.Method, r.URL, r.Headers, r.Body), nil
 	}
 	return curlSnippet(r.Method, r.URL, r.Headers, r.Body), nil
+}
+
+// normalizeMethod 把 method 收敛为代码安全的 token：空→GET；
+// 合法形态为字母开头的 [A-Za-z0-9_-]（RFC 自定义方法允许），否则报错。
+func normalizeMethod(m string) (string, error) {
+	m = strings.ToUpper(strings.TrimSpace(m))
+	if m == "" {
+		return "GET", nil
+	}
+	for i, r := range m {
+		alnum := (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-'
+		if r >= 'a' && r <= 'z' {
+			alnum = true // ToUpper 后不应出现，防御兼报错路径友好
+		}
+		if !alnum || (i == 0 && r >= '0' && r <= '9') {
+			return "", fmt.Errorf("codegen: 非法 HTTP 方法 %q", m)
+		}
+	}
+	return m, nil
 }
 
 // curlSnippet 生成可执行 cURL；输出格式与历史实现保持一致（回归点）。
@@ -175,8 +198,11 @@ func pythonSnippet(method, url string, headers []KV, body string) string {
 	} else {
 		b.WriteString("headers = {}\n")
 	}
+	// 审核 C-1：body 必须作为字符串字面量写入，不能裸拼进 Python 源码——
+	// 裸拼时 `hello` 是 NameError、`{"ok":true}` 的 true 未定义，而多行/恶意 body
+	// 直接变成代码注入面（复制运行即执行）。quote() 后交给 data= 的是 str，requests 接受。
 	if body != "" {
-		fmt.Fprintf(&b, "payload = %s\n", body)
+		fmt.Fprintf(&b, "payload = '%s'\n", quote(body))
 	}
 	// 无请求体时不带 data 参数。
 	if body != "" {
@@ -189,9 +215,18 @@ func pythonSnippet(method, url string, headers []KV, body string) string {
 }
 
 // quote 转义单引号字符串（JS/Python 通用）。
+// 审核 H-1：除反斜杠/单引号外还必须转义裸换行（CR/LF/Tab）与 U+2028/U+2029——
+// JS/Python 的单引号字面量不允许内嵌裸换行，美化过的多行 JSON（绝对主流）
+// 过去会生成跨行字面量 → SyntaxError；两个行终止符在 JS 里同样断行。
 func quote(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")
-	return strings.ReplaceAll(s, "'", "\\'")
+	s = strings.ReplaceAll(s, "'", "\\'")
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	s = strings.ReplaceAll(s, "\r", "\\r")
+	s = strings.ReplaceAll(s, "\t", "\\t")
+	s = strings.ReplaceAll(s, "\u2028", "\\u2028")
+	s = strings.ReplaceAll(s, "\u2029", "\\u2029")
+	return s
 }
 
 // GRPCRequest grpcurl 生成的中立入参（gRPC 专用，字段均已按调用方规则渲染完毕）。

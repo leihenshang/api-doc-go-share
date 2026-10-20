@@ -104,9 +104,11 @@ func TestSnippetQuote(t *testing.T) {
 }
 
 // TestSnippetCurlNoShellInjection curl 片段的每一处插值都不得让用户数据逃出引号。
+// 审核 C-2 后方法名在入口统一收敛（非法即报错，见 TestSnippetRejectsMaliciousMethod），
+// 这里用合法 method 验证 URL/头/体的 shell 转义防线不变。
 func TestSnippetCurlNoShellInjection(t *testing.T) {
 	r := Request{
-		Method: "GET; touch /tmp/pwned",
+		Method: "POST",
 		URL:    "http://h/p?a=1'&touch /tmp/pwned2&x='",
 		Body:   `{"k":"v'$(id)"}`,
 	}
@@ -116,18 +118,26 @@ func TestSnippetCurlNoShellInjection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Snippet(curl): %v", err)
 	}
-	// 每条命令分隔符都必须落在引号内：检查方法被整体引用（不以裸分号出现）
-	if strings.Contains(code, "-X GET; touch") {
-		t.Fatalf("HTTP 方法含元字符时必须加引号，got:\n%s", code)
-	}
-	if !strings.Contains(code, `-X 'GET; touch /tmp/pwned'`) {
-		t.Fatalf("HTTP 方法应被单引号整体包裹，got:\n%s", code)
-	}
 	// 每个用户来源的片段都应出现转义后的 '\'' 序列
 	for _, frag := range []string{"-H 'X-Q: v'\\''", "-d '{\"k\":\"v'\\''"} {
 		if !strings.Contains(code, frag) {
 			t.Fatalf("片段 %q 应做 shell 转义，got:\n%s", frag, code)
 		}
+	}
+}
+
+// TestSnippetRejectsMaliciousMethod 审核 C-2：导入集合可能携带被污染的 method，
+// 五种语言统一在入口拒绝（报错优于 curl 能过、其余三种漏注入的不一致行为）。
+func TestSnippetRejectsMaliciousMethod(t *testing.T) {
+	for _, l := range []Lang{LangCurl, LangFetch, LangAxios, LangGo, LangPython} {
+		_, err := Snippet(l, Request{Method: "GET; touch /tmp/pwned", URL: "http://h"})
+		if err == nil {
+			t.Fatalf("%s：恶意 method 应在入口报错", l)
+		}
+	}
+	// 合法自定义方法仍允许（RFC token）
+	if _, err := Snippet(LangCurl, Request{Method: "mY-Verb_2", URL: "http://h"}); err != nil {
+		t.Fatalf("自定义合法方法不应被拒：%v", err)
 	}
 }
 
@@ -223,5 +233,38 @@ func TestSnippetBodyNotDoubleSerialized(t *testing.T) {
 		if !strings.Contains(got, `'hello "world"'`) {
 			t.Fatalf("%s 片段的纯文本 body 应被引用:\n%s", lang, got)
 		}
+	}
+}
+
+// TestSnippetNoCodeInjection 审核 C-1/C-2/H-1 回归：
+//  1. 恶意 method（导入路径原样透传）在入口即拒绝；
+//  2. 多行 body 在 python 里必须是字符串字面量（不得裸拼成源码）；
+//  3. 多行/含引号 body 生成的 fetch/axios/python 片段全部转义为单行安全字面量。
+func TestSnippetNoCodeInjection(t *testing.T) {
+	if _, err := Snippet(LangFetch, Request{Method: "GET'; require('child_process').execSync('calc'); //", URL: "http://x"}); err == nil {
+		t.Fatal("恶意 method 应在入口被拒绝")
+	}
+	if _, err := Snippet(LangPython, Request{Method: "1POST", URL: "http://x"}); err == nil {
+		t.Fatal("数字开头的非法 method 应被拒绝")
+	}
+	r := Request{Method: "POST", URL: "http://x", Body: "{\n  \"ok\": true,\n  'q': 1\n}"}
+
+	py, err := Snippet(LangPython, r)
+	if err != nil {
+		t.Fatalf("python: %v", err)
+	}
+	if !strings.Contains(py, `payload = '{\n  "ok": true,\n  \'q\': 1\n}'`) {
+		t.Fatalf("python payload 应为转义后的单行字符串字面量:\n%s", py)
+	}
+	if strings.Contains(py, "payload = {") {
+		t.Fatalf("python payload 不得裸拼成源码:\n%s", py)
+	}
+
+	f, err := Snippet(LangFetch, r)
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if !strings.Contains(f, `body: '{\n  "ok": true,`) || !strings.Contains(f, `\n}',`) {
+		t.Fatalf("fetch 多行 body 应转义为 \n 单行字面量:\n%s", f)
 	}
 }
