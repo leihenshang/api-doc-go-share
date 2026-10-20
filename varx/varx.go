@@ -31,9 +31,12 @@ const (
 const MaskedValue = "••••••"
 
 // placeholderPattern 匹配 {{name}} / {{$builtin}}，并支持可选默认值段 {{name:默认值}}
-// （默认值不允许含花括号，避免与嵌套解析互相干扰）；渲染阶段不对名字长度设限，
-// 长度规则属于写入校验，由各端自己的变量名规则负责。
-var placeholderPattern = regexp.MustCompile(`\{\{\s*(\$?[A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([^{}]*))?\s*\}\}`)
+// （默认值不允许含花括号，避免与嵌套解析互相干扰）。
+// 审核 H-4：名字允许 `-`/`.`（如 clxone-ipam、a.b）——此前只支持 [A-Za-z0-9_]，
+// 客户端被迫在库外自建 alias 改写 shim，导致「同一占位符两端解析不一致」；
+// 现在两端统一走本包，客户端 shim 已删除。
+// 渲染阶段不对名字长度设限，长度规则属于写入校验，由各端自己的变量名规则负责。
+var placeholderPattern = regexp.MustCompile(`\{\{\s*(\$?[A-Za-z_][A-Za-z0-9_.\-]*)(?:\s*:\s*([^{}]*))?\s*\}\}`)
 
 // Var 一条变量的解析要素。
 type Var struct {

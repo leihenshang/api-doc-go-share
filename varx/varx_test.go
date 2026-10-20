@@ -222,3 +222,21 @@ func TestBuiltinsPartialNoPanic(t *testing.T) {
 	_ = Builtins{}.Values() // 全零值：回退默认，不 panic
 	_ = Builtins{UUID: func() string { return "z" }}.Values()
 }
+
+// TestWideNames 审核 H-4：含 `-`/`.` 的变量名在共享库内原生解析，两端语义统一。
+func TestWideNames(t *testing.T) {
+	tbl := Build([]Var{
+		{Name: "clxone-ipam", Value: "10.0.0.1", Scope: ScopeProjectCommon, Enabled: true},
+		{Name: "a.b", Value: "nested", Scope: ScopeProjectCommon, Enabled: true},
+	}, 0)
+	got, missing := tbl.Resolve("http://{{clxone-ipam}}/{{a.b}}/{{x-y}}")
+	if got != "http://10.0.0.1/nested/{{x-y}}" {
+		t.Fatalf("got %q", got)
+	}
+	if len(missing) != 1 || missing[0] != "x-y" {
+		t.Fatalf("missing=%v，期望 [x-y]", missing)
+	}
+	if names := Names("{{a.b}}-{{c-d}}"); len(names) != 2 {
+		t.Fatalf("Names 宽名=%v", names)
+	}
+}

@@ -2,6 +2,15 @@
 
 本库遵循[语义化版本](https://semver.org/lang/zh-CN/)：破坏性变更必须两个消费方（服务端 / 客户端）同步升级，库内不保留兼容分支。
 
+## [v0.12.0] - 2026-10-20
+
+### 安全修复（代码审核 2026-10-19 系列，行为收紧但不改类型形状）
+
+- `codegen`：python 片段 payload 改为字符串字面量（不再裸拼源码：`hello`/JSON 布尔注入都不再成立）；HTTP method 入口白名单收敛，非法方法五种语言统一报错；`quote()` 补转义 `\n`/`\r`/`\t` 与 U+2028/U+2029（多行 JSON 不再产生跨行字面量）。
+- `varx`：占位符名字原生支持 `-`/`.`（两端语义统一，客户端 alias shim 同步删除）；嵌套展开加记忆化 + 步数预算（2 万）+ 单值 256KB 输出熔断（~1KB 恶意集合文件不再能指数放大打挂两端）；`Builtins` 半填（Now/UUID 为 nil）回退默认实现不再 panic；`$uuid` 生成失败保留占位符不写空串缓存；环展开保留原文并记缺失。
+- `openapi`：多 content type 的响应示例选择改确定（优先 application/json，余按字典序），两端导入结果不再分叉。
+- `mock`：`Path` 支持无 scheme 的 `host[:port]/path` 写法剥地址段；模板变量地址需调用方先渲染（契约写入注释）。
+
 ## [v0.11.0] - 2026-10-17
 
 ### 新增（向后兼容）
@@ -64,6 +73,18 @@
 - `collection`：`RequestSettings.EncodeURL` 由 `bool` 改为 `*bool`，与同结构体的 `FollowRedirects` / `InsecureSSL` 三态口径统一——`nil` = 未设置（消费方回落默认「编码」），`true` = 对 URL 查询串/路径做百分号编码，`false` = 原样发送不编码。此前零值 `false` 会被误当成「显式关闭编码」，无法区分「没配」与「配了关」。`collection_test` 已同步。
   - 消费方：客户端 `runner` 按 `*bool` 读取（`MergeOptions` 仅在非 nil 时覆盖，默认 `EncodeURL=true`，未配置行为与历史逐字节一致）；服务端不读取该字段。**客户端与服务端均需把 go.mod 升到 v0.8.0。**
 
+## [v0.7.0] - 2026-10-10 【补记，审核 H-8】
+
+### 变更
+
+- `collection`：环境名校验规则重构（`cb3e989`），支持更多合法字符。属两端共用的**校验行为变更**，当时未记录CHANGELOG，此处追溯。
+
+## [v0.6.0] - 2026-10-08 【补记，审核 H-8】
+
+### 变更（破坏性）
+
+- `collection`：导出类型 `Var` 重命名为 `EnvVar`（`9f7e8b4`，避开 JS 保留字）。当时按 minor 发布且无记录，按惯例应为 major/标注破坏性，此处追溯。
+
 ## [v0.5.0] - 2026-10-02
 
 ### 新增
@@ -87,7 +108,13 @@
 - `collection`：`RequestFile.HTTP` 标签改为 `http,omitempty` 并新增 `HTTPBlock.IsZero()`（yaml.v3 认 `IsZeroer`）—— gRPC 请求文件不再写出空的 `http: {}` 段；`HTTP` 保持值类型，HTTP 请求文件的编码结果与既有读取方都不受影响。
 - 工程：移除 GitHub Actions 工作流（`.github/workflows/ci.yml`），校验改由各仓库门禁脚本承担。
 
-## [v0.2.0] - 2026-09-28
+## [v0.3.0] - 2026-10-01 【补记，审核 H-8】
+
+### 变更
+
+- 模块路径改名为 `github.com/leihenshang/api-doc-go-share`（`9b2a14c`）；消费方需改 import。无 CHANGELOG 记录，此处追溯。
+
+## [v0.2.0] - 2026-09-28（未打 tag，不可 `go get`，仅文档记录）
 
 ### 新增
 
@@ -100,7 +127,7 @@
   - 服务端：Postman / OpenAPI 的导入导出改调 `postman` / `openapi`，落库、分组复用、去重键、权限与操作日志仍留在 `service`；导入顺序由内核排序保证确定。
   - 客户端：新增导入入口 `App.ImportCollection`（format：`postman` / `openapi`）与 `Collection.ImportPostman` / `Collection.ImportOpenAPI`，把中立结构映射为本地请求并落盘，按「方法 + 地址」跳过重复。
 
-## [v0.1.0] - 2026-09-28
+## [v0.1.0] - 2026-09-28（未打 tag，不可 `go get`，仅文档记录）
 
 首个版本，从服务端与客户端各自实现中抽出「两端必须一致」的规则与定义。
 
