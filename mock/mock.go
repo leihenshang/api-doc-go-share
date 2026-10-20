@@ -28,6 +28,13 @@ func Path(raw string) string {
 		} else {
 			u = "/"
 		}
+		return u
+	}
+	// 审核 H-6：无 scheme 但形如 host[:port]/path（API 工具极常见写法，如 localhost:8080/api/x）：
+	// 首段含 ":" 或 "." 视为地址段剔掉。模板变量段（{{host}}/x）不命中此启发式——
+	// 契约：调用方先经 varx.Resolve 渲染地址再交给归一化（见 NormalizeURL 注释）。
+	if j := strings.Index(u, "/"); j > 0 && strings.ContainsAny(u[:j], ":.") {
+		return u[j:]
 	}
 	return u
 }

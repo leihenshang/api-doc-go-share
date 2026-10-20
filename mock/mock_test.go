@@ -86,3 +86,21 @@ func TestMatch(t *testing.T) {
 		t.Fatalf("空列表应返回 -1，got %d", i)
 	}
 }
+
+// TestPathHostPortNoScheme 审核 H-6：无 scheme 的 host[:port]/path（API 工具常见写法）必须剥掉地址段。
+func TestPathHostPortNoScheme(t *testing.T) {
+	cases := map[string]string{
+		"localhost:8080/api/users": "/api/users",
+		"127.0.0.1:9000/v1/x?a=1":  "/v1/x",
+		"example.com/docs":         "/docs",
+		"/api/users":               "/api/users",
+		"api/users":                "api/users",
+		"{{host}}/api/x":           "{{host}}/api/x", // 模板变量：契约要求调用方先渲染
+		"example.com":              "example.com",
+	}
+	for in, want := range cases {
+		if got := Path(in); got != want {
+			t.Errorf("Path(%q)=%q want %q", in, got, want)
+		}
+	}
+}

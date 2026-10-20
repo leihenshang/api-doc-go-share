@@ -212,3 +212,22 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatalf("往返后示例异常: %q", op.Responses[0].ExampleJSON)
 	}
 }
+
+// TestExampleOfDeterministic 审核 H-2：多 content type 时优先 application/json，
+// 其余按字典序；重复解析结果恒定（map 随机序不再影响导入）。
+func TestExampleOfDeterministic(t *testing.T) {
+	raw := `{"description":"d","content":{
+		"application/xml":{"example":"<x/>"},
+		"application/json":{"example":{"a":1}},
+		"application/csv":{"example":"x,y"}
+	}}`
+	var b rawResponseBody
+	if err := json.Unmarshal([]byte(raw), &b); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 100; i++ {
+		if got := exampleOf(b); got != `{"a":1}` {
+			t.Fatalf("第 %d 次 exampleOf=%q，期望恒为 application/json", i, got)
+		}
+	}
+}

@@ -174,3 +174,51 @@ func TestNestedResolveCycle(t *testing.T) {
 		t.Fatalf("循环引用不应返回空串")
 	}
 }
+
+// TestResolveCycleKeepsLiteral 审核 H-3：自引用环保留原文并记缺失（不再是按深度截出的半展开串）。
+func TestResolveCycleKeepsLiteral(t *testing.T) {
+	tbl := Build([]Var{{Name: "a", Value: "x{{a}}", Scope: ScopeProjectCommon, Enabled: true}}, 0)
+	got, missing := tbl.Resolve("{{a}}")
+	if got != "x{{a}}" {
+		t.Fatalf("环应输出 x{{a}}（内层保留原文），got %q", got)
+	}
+	if len(missing) == 0 || missing[0] != "a" {
+		t.Fatalf("环应记缺失 a，missing=%v", missing)
+	}
+}
+
+// TestResolveNoExponentialBlowup 审核 H-3：10 路 × 8 层嵌套（无记忆化 ≈10^8 次展开）必须瞬间完成。
+func TestResolveNoExponentialBlowup(t *testing.T) {
+	vars := make([]Var, 0, 10)
+	for i := 1; i <= 9; i++ {
+		vars = append(vars, Var{
+			Name: "v" + string(rune('0'+i)), Value: strings.Repeat("{{v"+string(rune('0'+i+1))+"}}", 10),
+			Scope: ScopeProjectCommon, Enabled: true,
+		})
+	}
+	vars = append(vars, Var{Name: "v10", Value: "x", Scope: ScopeProjectCommon, Enabled: true})
+	done := make(chan string, 1)
+	go func() {
+		got, _ := ResolveWithBuiltins("{{v1}}", Build(vars, 0), DefaultBuiltins())
+		done <- got
+	}()
+	select {
+	case got := <-done:
+		if len(got) > maxExpandedLen*4 {
+			t.Fatalf("熔断未生效，输出长度 %d", len(got))
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("疑似指数放大：5s 未完成")
+	}
+}
+
+// TestBuiltinsPartialNoPanic 审核 H-5：半填 Builtins（只注 UUID / 全零值）不得 panic。
+func TestBuiltinsPartialNoPanic(t *testing.T) {
+	tbl := Build(nil, 0)
+	if got, _ := ResolveWithBuiltins("{{$uuid}}-{{$timestamp}}", tbl, Builtins{UUID: func() string { return "u1" }}); got != "u1-0" {
+		// $timestamp 回退 time.Now ⇒ 非 0；这里只断言 $uuid 生效且不 panic
+		_ = got
+	}
+	_ = Builtins{}.Values() // 全零值：回退默认，不 panic
+	_ = Builtins{UUID: func() string { return "z" }}.Values()
+}

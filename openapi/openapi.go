@@ -258,13 +258,22 @@ func (r rawOperation) toOperation(path, method string, shared []rawParam) Operat
 	return op
 }
 
-// exampleOf 取 content.application/json.example 的 JSON 文本（无则空）。
+// exampleOf 取响应示例的 JSON 文本（无则空）。
+// 审核 H-2：多 content type 时选择必须确定——优先 application/json，
+// 否则按 content type 字典序取第一个带 example 的（map 遍历随机序会让两端导入结果分叉）。
 func exampleOf(body rawResponseBody) string {
-	for _, ct := range body.Content {
-		if len(ct.Example) == 0 {
-			continue
+	if c, ok := body.Content["application/json"]; ok && len(c.Example) > 0 {
+		return string(c.Example)
+	}
+	keys := make([]string, 0, len(body.Content))
+	for k := range body.Content {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if ex := body.Content[k].Example; len(ex) > 0 {
+			return string(ex)
 		}
-		return string(ct.Example)
 	}
 	return ""
 }
