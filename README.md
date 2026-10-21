@@ -3,8 +3,8 @@
 API-DOC（Go 服务端 + Wails 桌面客户端）的**共享底层库**：只放两端必须保持一致的「规则 / 算法 / 定义」，不放 IO、数据库、HTTP 框架与 UI。
 
 - 模块路径：`github.com/leihenshang/api-doc-go-share`
-- Go 版本：`1.25`（取两个消费方的较低者；库内不使用更高版本的新特性）
-- 当前状态：已发布到 GitHub（公开仓库 [leihenshang/api-doc-go-share](https://github.com/leihenshang/api-doc-go-share)，当前 tag `v0.10.3`，版本历史见 [CHANGELOG.md](./CHANGELOG.md)）；本地联调用 `bash scripts/gowork.sh` 在父目录生成 `go.work`（P2-28），`--off` 取消
+- Go 版本：`1.26`（取两个消费方的较低者；库内不使用更高版本的新特性）
+- 当前状态：已发布到 GitHub（公开仓库 [leihenshang/api-doc-go-share](https://github.com/leihenshang/api-doc-go-share)，当前 tag `v0.12.0`，版本历史见 [CHANGELOG.md](./CHANGELOG.md)）；本地联调用 `bash scripts/gowork.sh` 在父目录生成 `go.work`（P2-28），`--off` 取消
 
 ## 包含什么
 
