@@ -1,4 +1,4 @@
-// Package collection 定义集合文件（Bruno OpenCollection 风格 yml）的格式与纯编解码规则。
+// Package collection 定义集合文件（兼容 Bruno OpenCollection 的 yml）的格式与纯编解码规则。
 // 只搬「格式」不搬 IO：目录扫描、读写文件与 trash 移动由各端自己做，磁盘后半句一致靠这里。
 package collection
 
