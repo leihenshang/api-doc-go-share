@@ -85,6 +85,9 @@ func TestWireKeys(t *testing.T) {
 	assertKeys(t, "Payload(example)", keysOf(t, Payload{
 		Name: "n", APIUID: "a", Sample: "{}", Status: 200, ContentType: "application/json", Seq: 1,
 	}), []string{"name", "api_uid", "sample", "status", "content_type", "seq"})
+	assertKeys(t, "Payload(field_mapping)", keysOf(t, Payload{
+		Field: "data.id", FieldType: "integer", Description: "主键",
+	}), []string{"field", "field_type", "description"})
 }
 
 // TestConstants 常量值即线上字面量，改动会让老客户端认不出类型。
@@ -92,7 +95,8 @@ func TestConstants(t *testing.T) {
 	want := map[string]string{
 		"group": TypeGroup, "api": TypeAPI, "doc": TypeDoc,
 		"example": TypeExample, "variable": TypeVariable, "variable_env": TypeVarEnv,
-		"upsert": OpUpsert, "delete": OpDelete,
+		"field_mapping": TypeFieldMapping,
+		"upsert":        OpUpsert, "delete": OpDelete,
 		"ok": StatusOK, "conflict": StatusConflict, "rejected": StatusRejected,
 	}
 	for k, v := range want {

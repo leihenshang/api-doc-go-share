@@ -23,6 +23,8 @@ const (
 	TypeExample  = "example"
 	TypeVariable = "variable"
 	TypeVarEnv   = "variable_env"
+	// TypeFieldMapping 项目级字段字典（field_mapping 表）：field/type/description。
+	TypeFieldMapping = "field_mapping"
 )
 
 // 操作类型。
@@ -141,6 +143,10 @@ type Payload struct {
 	Value   string `json:"value,omitempty"`
 	Secret  bool   `json:"secret,omitempty"`
 	Enabled *bool  `json:"enabled,omitempty"`
+	// field_mapping：项目字段字典（Field 为字段路径如 data.list[].id，FieldType 为类型名）。
+	Field       string `json:"field,omitempty"`
+	FieldType   string `json:"field_type,omitempty"`
+	Description string `json:"description,omitempty"`
 	// 通用
 	Deleted bool `json:"deleted,omitempty"`
 }

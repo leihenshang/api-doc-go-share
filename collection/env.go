@@ -69,6 +69,17 @@ type Manifest struct {
 	} `yaml:"meta"`
 	// GRPC 集合级默认 gRPC 定义：请求自身没写 proto 时回落到它（一次配置，多个请求共享）
 	GRPC *GRPCDefault `yaml:"grpc,omitempty"`
+	// Defaults 集合级公共请求参数：请求未覆盖时生效（请求头同名以请求为准，认证按 inherit 继承）。
+	Defaults *Defaults `yaml:"defaults,omitempty"`
+}
+
+// Defaults 集合级公共请求参数（清单里的 defaults 段）。
+// 一次性配置所有请求共享的请求头与认证；值支持 {{变量}}。
+// 语义：请求头同名（大小写不敏感）由请求覆盖，enabled=false 的行不发送；
+// 认证仅在请求 auth 为 inherit（或未设置）时生效，none/basic/bearer/apikey 均以请求为准。
+type Defaults struct {
+	Headers []KV  `yaml:"headers,omitempty"`
+	Auth    *Auth `yaml:"auth,omitempty"`
 }
 
 // GRPCDefault 集合级默认 gRPC 定义（清单里的 grpc 段）。

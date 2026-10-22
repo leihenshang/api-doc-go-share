@@ -270,3 +270,44 @@ func TestManifestGRPCDefaultCodec(t *testing.T) {
 		t.Fatalf("未配置默认定义时不应写出 grpc 段：\n%s", pdata)
 	}
 }
+
+// TestManifestDefaultsCodec 校验集合级公共参数（defaults）的请求头/认证 round-trip。
+func TestManifestDefaultsCodec(t *testing.T) {
+	m := &Manifest{}
+	m.Info.Name, m.Meta.UID = "demo", "uid-1"
+	m.Defaults = &Defaults{
+		Headers: []KV{
+			{Name: "X-Tenant", Value: "{{tenant}}", Enabled: true},
+			{Name: "X-Legacy", Value: "off", Enabled: false},
+		},
+		Auth: &Auth{Type: "bearer", Token: "{{token}}"},
+	}
+	data, err := m.Encode("1.0.0")
+	if err != nil {
+		t.Fatalf("Encode manifest: %v", err)
+	}
+	back, err := DecodeManifest(data)
+	if err != nil {
+		t.Fatalf("DecodeManifest: %v", err)
+	}
+	if back.Defaults == nil || len(back.Defaults.Headers) != 2 {
+		t.Fatalf("defaults.headers round-trip 不符: %+v", back.Defaults)
+	}
+	if back.Defaults.Headers[1].Enabled {
+		t.Fatalf("enabled=false 的集合级请求头应保留禁用态: %+v", back.Defaults.Headers[1])
+	}
+	if back.Defaults.Auth == nil || back.Defaults.Auth.Type != "bearer" || back.Defaults.Auth.Token != "{{token}}" {
+		t.Fatalf("defaults.auth round-trip 不符: %+v", back.Defaults.Auth)
+	}
+
+	// 未配置时不写出该段（旧清单与旧客户端不受影响）
+	plain := &Manifest{}
+	plain.Info.Name, plain.Meta.UID = "demo", "uid-2"
+	pdata, err := plain.Encode("1.0.0")
+	if err != nil {
+		t.Fatalf("Encode manifest: %v", err)
+	}
+	if strings.Contains(string(pdata), "defaults:") {
+		t.Fatalf("未配置公共参数时不应写出 defaults 段：\n%s", pdata)
+	}
+}
