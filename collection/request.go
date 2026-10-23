@@ -86,7 +86,7 @@ type FolderFile struct {
 	Extra map[string]any `yaml:"-"`
 }
 
-// knownTopLevel 已知的顶层字段；其余键按「未知字段」原样保留。
+// knownTopLevel 请求/分组文件已知的顶层字段；其余键按「未知字段」原样保留。
 var knownTopLevel = map[string]bool{"info": true, "meta": true, "http": true, "grpc": true, "docs": true, "settings": true}
 
 // UnmarshalYAML 解码请求文件并把未知顶层字段收进 Extra。
@@ -97,7 +97,7 @@ func (f *RequestFile) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 	*f = RequestFile(tmp)
-	f.Extra = unknownTopLevel(node)
+	f.Extra = unknownTopLevel(node, knownTopLevel)
 	return nil
 }
 
@@ -105,7 +105,7 @@ func (f *RequestFile) UnmarshalYAML(node *yaml.Node) error {
 func (f RequestFile) MarshalYAML() (any, error) {
 	// plain 剥掉 MarshalYAML 方法，否则 node.Encode 会递归调用回来。
 	type plain RequestFile
-	return marshalWithExtra(plain(f), f.Extra)
+	return marshalWithExtra(plain(f), f.Extra, knownTopLevel)
 }
 
 // MergeExtra 把另一份文件的未知字段并入（已存在的键以本文件为准）。
@@ -132,14 +132,14 @@ func (f *FolderFile) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 	*f = FolderFile(tmp)
-	f.Extra = unknownTopLevel(node)
+	f.Extra = unknownTopLevel(node, knownTopLevel)
 	return nil
 }
 
 // MarshalYAML 编码分组文件并追加未知字段。
 func (f FolderFile) MarshalYAML() (any, error) {
 	type plain FolderFile
-	return marshalWithExtra(plain(f), f.Extra)
+	return marshalWithExtra(plain(f), f.Extra, knownTopLevel)
 }
 
 // DecodeRequest 解析请求文件内容。
@@ -170,12 +170,12 @@ func (f *FolderFile) Encode() ([]byte, error) {
 	return yaml.Marshal(f)
 }
 
-// unknownTopLevel 取节点里不属于已知字段的顶层键值。
-func unknownTopLevel(node *yaml.Node) map[string]any {
+// unknownTopLevel 取节点里不属于 known 的顶层键值。
+func unknownTopLevel(node *yaml.Node, known map[string]bool) map[string]any {
 	var extra map[string]any
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		key := node.Content[i].Value
-		if knownTopLevel[key] {
+		if known[key] {
 			continue
 		}
 		var v any
@@ -191,7 +191,8 @@ func unknownTopLevel(node *yaml.Node) map[string]any {
 }
 
 // marshalWithExtra 先把主体编成节点，再按字段名字序追加未知字段。
-func marshalWithExtra(v any, extra map[string]any) (any, error) {
+// known 中的键只由结构体输出，Extra 里即使有也不能再次追加（否则会产出重复 YAML 键，审核 M-2）。
+func marshalWithExtra(v any, extra map[string]any, known map[string]bool) (any, error) {
 	var node yaml.Node
 	if err := node.Encode(v); err != nil {
 		return nil, err
@@ -205,6 +206,9 @@ func marshalWithExtra(v any, extra map[string]any) (any, error) {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
+		if known[k] {
+			continue
+		}
 		var value yaml.Node
 		if err := value.Encode(extra[k]); err != nil {
 			continue

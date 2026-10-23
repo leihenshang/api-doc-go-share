@@ -7,8 +7,10 @@
 ### 新增（向后兼容）
 
 - **`syncapi`**：新增同步实体类型 `field_mapping`（项目级字段字典，服务端 `field_mapping` 表）。`Payload` 增加 `field` / `field_type` / `description` 三键（均 `omitempty`），一条字段字典变更只带这三个键。
-  - 协议键集不变（`Proto` 仍为 1）：旧客户端不识别该类型时按未知类型跳过，新客户端对未开启该能力 的服务端也只会收到空集。
+  - 协议键集不变（`Proto` 仍为 1）：旧客户端不识别该类型时按未知类型跳过，新客户端对未开启该能力的服务端也只会收到空集。
   - 消费方：发布前把服务端与客户端的 `go.mod` require 升到 `v0.13.0`（打 tag 后 `go get`）。
+- **`syncapi.Payload.Redacted`**（审核 H-11）：服务端对**无明文权限**的调用方隐藏明文 secret 的 `value`，置 `redacted=true`；客户端应保留本地已有值。`enc:v1:` 密文始终原样回传（客户端可用口令解密后使用）。
+- **`collection`**：`EnvFile` / `SecretsFile` / `Manifest` 补 `Extra` 未知顶层字段 round-trip（审核 M-1），新增 `DecodeSecretsFile`/`SecretsFile.Encode`；`marshalWithExtra` 跳过已知键，避免 Extra 注入已知键时产出重复 YAML 键（审核 M-2）。
 
 ## [v0.12.0] - 2026-10-20
 

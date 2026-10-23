@@ -23,11 +23,57 @@ type EnvFile struct {
 	// UID 环境稳定身份（同步用 ext_uid）；旧文件缺省时由客户端首次同步补齐。
 	UID  string   `yaml:"uid,omitempty" json:"uid,omitempty"`
 	Vars []EnvVar `yaml:"vars"`
+	// Extra 未被识别的顶层字段：整份重写时原样带回（审核 M-1）。
+	Extra map[string]any `yaml:"-"`
+}
+
+// envKnownTopLevel 环境主文件已知的顶层字段。
+var envKnownTopLevel = map[string]bool{"info": true, "uid": true, "vars": true}
+
+// UnmarshalYAML 解码环境主文件并把未知顶层字段收进 Extra。
+func (f *EnvFile) UnmarshalYAML(node *yaml.Node) error {
+	type plain EnvFile
+	var tmp plain
+	if err := node.Decode(&tmp); err != nil {
+		return err
+	}
+	*f = EnvFile(tmp)
+	f.Extra = unknownTopLevel(node, envKnownTopLevel)
+	return nil
+}
+
+// MarshalYAML 编码环境主文件并追加 Extra 中的未知字段（按字段名排序，输出稳定）。
+func (f EnvFile) MarshalYAML() (any, error) {
+	type plain EnvFile
+	return marshalWithExtra(plain(f), f.Extra, envKnownTopLevel)
 }
 
 // SecretsFile 环境的 secret 值文件（ *.secrets.yml ）。
 type SecretsFile struct {
 	Secrets map[string]string `yaml:"secrets"`
+	// Extra 未被识别的顶层字段：整份重写时原样带回（审核 M-1）。
+	Extra map[string]any `yaml:"-"`
+}
+
+// secretsKnownTopLevel secret 文件已知的顶层字段。
+var secretsKnownTopLevel = map[string]bool{"secrets": true}
+
+// UnmarshalYAML 解码 secret 文件并把未知顶层字段收进 Extra。
+func (f *SecretsFile) UnmarshalYAML(node *yaml.Node) error {
+	type plain SecretsFile
+	var tmp plain
+	if err := node.Decode(&tmp); err != nil {
+		return err
+	}
+	*f = SecretsFile(tmp)
+	f.Extra = unknownTopLevel(node, secretsKnownTopLevel)
+	return nil
+}
+
+// MarshalYAML 编码 secret 文件并追加 Extra 中的未知字段。
+func (f SecretsFile) MarshalYAML() (any, error) {
+	type plain SecretsFile
+	return marshalWithExtra(plain(f), f.Extra, secretsKnownTopLevel)
 }
 
 // DecodeEnv 解析环境主文件内容。
@@ -44,16 +90,31 @@ func (f *EnvFile) Encode() ([]byte, error) {
 	return yaml.Marshal(f)
 }
 
-// DecodeSecrets 解析 secret 文件内容（主文件里 secret 变量只留占位）。
-func DecodeSecrets(data []byte) (map[string]string, error) {
+// DecodeSecretsFile 解析 secret 文件内容（含未知顶层字段，审核 M-1）。
+func DecodeSecretsFile(data []byte) (*SecretsFile, error) {
 	var f SecretsFile
 	if err := yaml.Unmarshal(data, &f); err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
+// DecodeSecrets 解析 secret 文件里的值映射（主文件里 secret 变量只留占位）。
+// 需要保留未知字段时用 DecodeSecretsFile。
+func DecodeSecrets(data []byte) (map[string]string, error) {
+	f, err := DecodeSecretsFile(data)
+	if err != nil {
 		return nil, err
 	}
 	return f.Secrets, nil
 }
 
-// EncodeSecrets 序列化 secret 文件。
+// Encode 序列化 secret 文件（含未知字段，审核 M-1）。
+func (f *SecretsFile) Encode() ([]byte, error) {
+	return yaml.Marshal(f)
+}
+
+// EncodeSecrets 序列化 secret 文件（无未知字段的便捷入口）。
 func EncodeSecrets(secrets map[string]string) ([]byte, error) {
 	return yaml.Marshal(&SecretsFile{Secrets: secrets})
 }
@@ -71,6 +132,31 @@ type Manifest struct {
 	GRPC *GRPCDefault `yaml:"grpc,omitempty"`
 	// Defaults 集合级公共请求参数：请求未覆盖时生效（请求头同名以请求为准，认证按 inherit 继承）。
 	Defaults *Defaults `yaml:"defaults,omitempty"`
+	// Extra 未被识别的顶层字段：整份重写时原样带回（审核 M-1）。
+	Extra map[string]any `yaml:"-"`
+}
+
+// manifestKnownTopLevel 集合清单已知的顶层字段。
+var manifestKnownTopLevel = map[string]bool{
+	"opencollection": true, "info": true, "meta": true, "grpc": true, "defaults": true,
+}
+
+// UnmarshalYAML 解码集合清单并把未知顶层字段收进 Extra。
+func (m *Manifest) UnmarshalYAML(node *yaml.Node) error {
+	type plain Manifest
+	var tmp plain
+	if err := node.Decode(&tmp); err != nil {
+		return err
+	}
+	*m = Manifest(tmp)
+	m.Extra = unknownTopLevel(node, manifestKnownTopLevel)
+	return nil
+}
+
+// MarshalYAML 编码集合清单并追加 Extra 中的未知字段。
+func (m Manifest) MarshalYAML() (any, error) {
+	type plain Manifest
+	return marshalWithExtra(plain(m), m.Extra, manifestKnownTopLevel)
 }
 
 // Defaults 集合级公共请求参数（清单里的 defaults 段）。

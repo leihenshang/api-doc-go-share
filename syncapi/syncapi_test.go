@@ -82,6 +82,10 @@ func TestWireKeys(t *testing.T) {
 	assertKeys(t, "Payload(variable)", keysOf(t, Payload{
 		Name: "n", Value: "v", Secret: true, Enabled: &enabled, EnvUID: "e",
 	}), []string{"name", "value", "secret", "enabled", "env_uid"})
+	// 无可看明文权限时服务端只下发元数据，值不出现（redacted=true）。
+	assertKeys(t, "Payload(variable-redacted)", keysOf(t, Payload{
+		Name: "n", Secret: true, Enabled: &enabled, EnvUID: "e", Redacted: true,
+	}), []string{"name", "secret", "enabled", "env_uid", "redacted"})
 	assertKeys(t, "Payload(example)", keysOf(t, Payload{
 		Name: "n", APIUID: "a", Sample: "{}", Status: 200, ContentType: "application/json", Seq: 1,
 	}), []string{"name", "api_uid", "sample", "status", "content_type", "seq"})

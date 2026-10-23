@@ -143,6 +143,9 @@ type Payload struct {
 	Value   string `json:"value,omitempty"`
 	Secret  bool   `json:"secret,omitempty"`
 	Enabled *bool  `json:"enabled,omitempty"`
+	// Redacted 为真表示服务端没有下发明文敏感值（调用方无明文权限，审核 H-11）：
+	// 客户端必须保留本地已有值，不得用空值/掩码值覆盖。密文（enc:v1:）始终原样回传。
+	Redacted bool `json:"redacted,omitempty"`
 	// field_mapping：项目字段字典（Field 为字段路径如 data.list[].id，FieldType 为类型名）。
 	Field       string `json:"field,omitempty"`
 	FieldType   string `json:"field_type,omitempty"`
