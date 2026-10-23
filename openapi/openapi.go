@@ -38,9 +38,13 @@ type Operation struct {
 }
 
 // Param 请求参数。
+// Type/Format 来自 OpenAPI 的 schema（如 integer/int64、string/date-time），
+// 供契约 diff 判断类型变化；缺失时为空串。
 type Param struct {
 	Name        string
 	In          string // query / path / header / cookie
+	Type        string
+	Format      string
 	Description string
 	Example     string
 	Required    bool
@@ -62,6 +66,17 @@ func Decode(data []byte) (*Document, error) {
 	var raw rawDocument
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, err
+	}
+	// 审核 M-10 / Q-02：此前任意 JSON 都会被当成空文档导入成功；
+	// 这里要求显式 openapi 3.x，并对 Swagger 2.0 给出可操作提示。
+	if strings.TrimSpace(raw.Swagger) != "" {
+		return nil, fmt.Errorf("检测到 Swagger 2.0（swagger: %s）；请先转换为 OpenAPI 3.x", raw.Swagger)
+	}
+	if strings.TrimSpace(raw.OpenAPI) == "" {
+		return nil, fmt.Errorf("缺少 openapi 版本字段（需为 OpenAPI 3.x JSON）")
+	}
+	if !strings.HasPrefix(strings.TrimSpace(raw.OpenAPI), "3.") {
+		return nil, fmt.Errorf("不支持的 OpenAPI 版本 %q（仅支持 3.x）", raw.OpenAPI)
 	}
 	doc := &Document{Title: raw.Info.Title, Version: raw.Info.Version}
 	paths := make([]string, 0, len(raw.Paths))
@@ -158,6 +173,13 @@ func (p Param) encode() map[string]any {
 	if p.Description != "" {
 		out["description"] = p.Description
 	}
+	if p.Type != "" {
+		schema := map[string]any{"type": p.Type}
+		if p.Format != "" {
+			schema["format"] = p.Format
+		}
+		out["schema"] = schema
+	}
 	if p.Example != "" {
 		out["example"] = p.Example
 	}
@@ -194,7 +216,9 @@ func encodeResponses(resps []Response) map[string]any {
 // ---- 解码用结构 ----
 
 type rawDocument struct {
-	Info struct {
+	OpenAPI string `json:"openapi"`
+	Swagger string `json:"swagger"`
+	Info    struct {
 		Title   string `json:"title"`
 		Version string `json:"version"`
 	} `json:"info"`
@@ -218,6 +242,10 @@ type rawParam struct {
 	Description string          `json:"description"`
 	Required    bool            `json:"required"`
 	Example     json.RawMessage `json:"example"`
+	Schema      struct {
+		Type   string `json:"type"`
+		Format string `json:"format"`
+	} `json:"schema"`
 }
 
 type rawResponseBody struct {
@@ -240,8 +268,8 @@ func (r rawOperation) toOperation(path, method string, shared []rawParam) Operat
 	}
 	for _, p := range mergeParams(shared, r.Parameters) {
 		op.Params = append(op.Params, Param{
-			Name: p.Name, In: p.In, Description: p.Description,
-			Example: scalarText(p.Example), Required: p.Required,
+			Name: p.Name, In: p.In, Type: p.Schema.Type, Format: p.Schema.Format,
+			Description: p.Description, Example: scalarText(p.Example), Required: p.Required,
 		})
 	}
 	codes := make([]string, 0, len(r.Responses))

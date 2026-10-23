@@ -17,7 +17,7 @@ const sample = `{
         "operationId": "listUser",
         "tags": ["用户"],
         "parameters": [
-          { "name": "page", "in": "query", "description": "页码", "required": true, "example": 1 }
+          { "name": "page", "in": "query", "description": "页码", "required": true, "example": 1, "schema": { "type": "integer", "format": "int32" } }
         ],
         "responses": {
           "200": {
@@ -58,6 +58,9 @@ func TestDecode(t *testing.T) {
 	if len(op.Params) != 1 || op.Params[0].Name != "page" || !op.Params[0].Required || op.Params[0].Example != "1" {
 		t.Fatalf("参数解析异常: %+v", op.Params)
 	}
+	if op.Params[0].Type != "integer" || op.Params[0].Format != "int32" {
+		t.Fatalf("参数 schema 解析异常: %+v", op.Params[0])
+	}
 	if len(op.Responses) != 1 || op.Responses[0].Code != "200" {
 		t.Fatalf("响应解析异常: %+v", op.Responses)
 	}
@@ -77,6 +80,7 @@ func TestDecodeInvalid(t *testing.T) {
 // parameters / $ref / x-* 都不是操作，不能变成接口。
 func TestDecodeSkipsNonMethodKeys(t *testing.T) {
 	const doc = `{
+	  "openapi": "3.0.0",
 	  "info": { "title": "t", "version": "1" },
 	  "paths": {
 	    "/api/user": {
@@ -114,6 +118,7 @@ func TestDecodeSkipsNonMethodKeys(t *testing.T) {
 // TestDecodeOperationParamOverridesShared 操作级同名同 in 参数覆盖 path 级。
 func TestDecodeOperationParamOverridesShared(t *testing.T) {
 	const doc = `{
+	  "openapi": "3.0.0",
 	  "paths": {
 	    "/api/user": {
 	      "parameters": [
@@ -145,7 +150,7 @@ func TestDecodeOperationParamOverridesShared(t *testing.T) {
 
 // TestDecodeRejectsNonObjectOperation 方法体不是对象时报可定位错误，而不是静默吞掉。
 func TestDecodeRejectsNonObjectOperation(t *testing.T) {
-	_, err := Decode([]byte(`{"paths":{"/api/user":{"get":"TODO"}}}`))
+	_, err := Decode([]byte(`{"openapi":"3.0.0","paths":{"/api/user":{"get":"TODO"}}}`))
 	if err == nil {
 		t.Fatal("方法体非对象应报错")
 	}
@@ -159,7 +164,7 @@ func TestEncode(t *testing.T) {
 		{
 			Path: "{{host}}/api/user/list", Method: "GET", Summary: "用户-列表",
 			Tags:      []string{"用户"},
-			Params:    []Param{{Name: "page", In: "query", Description: "页码", Required: true}},
+			Params:    []Param{{Name: "page", In: "query", Type: "integer", Format: "int32", Description: "页码", Required: true}},
 			Responses: []Response{{Code: "200", Description: "成功", ExampleJSON: `{"code":200}`}},
 		},
 		{Path: "/api/login", Method: "post", Summary: "登录"},
@@ -173,6 +178,7 @@ func TestEncode(t *testing.T) {
 		`"openapi":"3.0.0"`, `"title":"导出项目"`, `"version":"2.0"`,
 		`"get":`, `"post":`, `"summary":"用户-列表"`, `"tags":["用户"]`,
 		`"name":"page"`, `"in":"query"`, `"required":true`,
+		`"schema":{`, `"type":"integer"`, `"format":"int32"`,
 		`"example":{"code":200}`, `"description":"成功"`,
 	} {
 		if !strings.Contains(text, want) {
@@ -190,7 +196,7 @@ func TestRoundTrip(t *testing.T) {
 	doc := &Document{Title: "往返", Version: "1.0", Ops: []Operation{{
 		Path: "/api/user/list", Method: "GET", Summary: "用户-列表", Description: "说明",
 		Tags:      []string{"用户"},
-		Params:    []Param{{Name: "page", In: "query", Example: "1"}},
+		Params:    []Param{{Name: "page", In: "query", Type: "integer", Example: "1"}},
 		Responses: []Response{{Code: "200", Description: "成功", ExampleJSON: `{"code":200,"data":[]}`}},
 	}}}
 	data, err := json.Marshal(doc.Encode())
@@ -205,7 +211,7 @@ func TestRoundTrip(t *testing.T) {
 	if op.Path != "/api/user/list" || op.Method != "get" || op.Summary != "用户-列表" || op.Description != "说明" {
 		t.Fatalf("往返后操作字段异常: %+v", op)
 	}
-	if len(op.Params) != 1 || op.Params[0].Example != "1" {
+	if len(op.Params) != 1 || op.Params[0].Example != "1" || op.Params[0].Type != "integer" {
 		t.Fatalf("往返后参数异常: %+v", op.Params)
 	}
 	if op.Responses[0].ExampleJSON != `{"code":200,"data":[]}` {
@@ -229,5 +235,19 @@ func TestExampleOfDeterministic(t *testing.T) {
 		if got := exampleOf(b); got != `{"a":1}` {
 			t.Fatalf("第 %d 次 exampleOf=%q，期望恒为 application/json", i, got)
 		}
+	}
+}
+
+func TestDecodeRequiresOpenAPIVersion(t *testing.T) {
+	if _, err := Decode([]byte(`{"paths":{"/x":{"get":{"summary":"x"}}}}`)); err == nil {
+		t.Fatal("缺少 openapi 版本应报错")
+	}
+	if _, err := Decode([]byte(`{"openapi":"2.0.0","paths":{}}`)); err == nil {
+		t.Fatal("非 3.x 版本应报错")
+	}
+	if _, err := Decode([]byte(`{"swagger":"2.0","paths":{}}`)); err == nil {
+		t.Fatal("Swagger 2.0 应报可操作错误")
+	} else if !strings.Contains(err.Error(), "Swagger 2.0") {
+		t.Fatalf("Swagger 错误应可读，got %v", err)
 	}
 }
