@@ -133,3 +133,35 @@ func TestMarshalWithExtraSkipsKnownKeys(t *testing.T) {
 		t.Fatalf("Extra 里的已知键不应被写出:\n%s", data)
 	}
 }
+
+// TestSummaryIsKnownTopLevel summary 必须是已知顶层字段：
+// 若漏登记，带 summary 的老文件解码时会被当成未知字段收进 Extra，
+// 编码时又与结构体输出重复成同名 YAML 键（或被 known 过滤静默丢掉）。
+func TestSummaryIsKnownTopLevel(t *testing.T) {
+	f, err := DecodeRequest([]byte(bodyFieldsSample))
+	if err != nil {
+		t.Fatalf("DecodeRequest: %v", err)
+	}
+	if _, ok := f.Extra["summary"]; ok {
+		t.Fatalf("summary 被当成未知字段收进 Extra: %+v", f.Extra)
+	}
+	// 即便 Extra 里混入 summary（历史脏数据），编码也不能产出重复键。
+	if f.Extra == nil {
+		f.Extra = map[string]any{}
+	}
+	f.Extra["summary"] = "evil"
+	data, err := f.Encode()
+	if err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	if strings.Count(string(data), "summary:") != 1 {
+		t.Fatalf("summary 出现了不止一次:\n%s", data)
+	}
+	back, err := DecodeRequest(data)
+	if err != nil {
+		t.Fatalf("重复键导致文件不可读: %v\n%s", err, data)
+	}
+	if back.Summary != "下单接口，创建一笔待支付订单" {
+		t.Fatalf("summary 被 Extra 覆盖: %q", back.Summary)
+	}
+}

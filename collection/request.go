@@ -32,12 +32,12 @@ type HTTPBlock struct {
 // IsZero 报告 http 段是否为空。配合 `yaml:"http,omitempty"` 让 gRPC 请求文件不带空的
 // `http: {}` 段（yaml.v3 对实现了 IsZeroer 的值类型字段同样支持 omitempty）。
 //
-// 判空必须覆盖 Body 的全部字段：只填了 body.descs（字段备注）的请求块并不为空，
-// 漏判会让这个块被 omitempty 整段丢掉，用户的备注凭空消失。
+// 判空必须覆盖 Body 的全部字段：只填了 body.descs（字段备注）或 body.fields（字段表格）的请求块
+// 并不为空，漏判会让这个块被 omitempty 整段丢掉，用户的备注/表格凭空消失。
 func (h HTTPBlock) IsZero() bool {
 	return h.Method == "" && h.URL == "" && len(h.Params) == 0 && len(h.Headers) == 0 &&
 		h.Body.Type == "" && h.Body.Raw == "" && h.Body.Data == "" && len(h.Body.Form) == 0 &&
-		len(h.Body.Descs) == 0 && h.Auth == nil
+		len(h.Body.Descs) == 0 && len(h.Body.Fields) == 0 && h.Auth == nil
 }
 
 // GRPCBlock 请求文件的 grpc 段（gRPC 请求；字段设计见
@@ -68,9 +68,11 @@ type GRPCTLS struct {
 // RequestFile 一条接口在磁盘上的形态（对应集合里的一个 .yml 文件）。
 // Extra 保存未被识别的顶层字段，写回时必须带回去（Bruno 兼容）。
 // Info.Type 为 http / grpc：http 用 HTTP 段，grpc 用 GRPC 段，另一段为空并整体省略。
+// Summary 为 API 概述（纯文本一句话说明用途），与详细说明 Docs 分列。
 type RequestFile struct {
 	Info     FileInfo         `yaml:"info"`
 	Meta     FileMeta         `yaml:"meta"`
+	Summary  string           `yaml:"summary,omitempty" json:"summary,omitempty"`
 	HTTP     HTTPBlock        `yaml:"http,omitempty"`
 	GRPC     *GRPCBlock       `yaml:"grpc,omitempty" json:"grpc,omitempty"`
 	Settings *RequestSettings `yaml:"settings,omitempty"`
@@ -87,7 +89,12 @@ type FolderFile struct {
 }
 
 // knownTopLevel 请求/分组文件已知的顶层字段；其余键按「未知字段」原样保留。
-var knownTopLevel = map[string]bool{"info": true, "meta": true, "http": true, "grpc": true, "docs": true, "settings": true}
+// summary 必须登记：否则解码时会把它当未知字段收进 Extra，编码时要么与结构体输出重复成两个同名 YAML 键，
+// 要么被 marshalWithExtra 的 known 过滤静默丢掉。
+var knownTopLevel = map[string]bool{
+	"info": true, "meta": true, "summary": true, "http": true,
+	"grpc": true, "docs": true, "settings": true,
+}
 
 // UnmarshalYAML 解码请求文件并把未知顶层字段收进 Extra。
 func (f *RequestFile) UnmarshalYAML(node *yaml.Node) error {

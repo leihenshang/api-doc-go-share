@@ -25,15 +25,29 @@ type KV struct {
 	Type        string `yaml:"type,omitempty" json:"type,omitempty"`
 }
 
+// BodyField 请求体字段表格的一行（表格即请求体字段说明的唯一真源：随文件落盘、随同步往返 server / Web）。
+// 命名与 ResponseParam（客户端 collection/types.go）对齐：name/type/required/example/description，
+// 仅把 fieldName 收短为 name —— 表格就是「字段名」本身，不含路径前缀语义。
+// Required 不 omitempty：与 KV.Enabled 同口径，落盘显式给出（false 也写），便于人工阅读与 diff。
+type BodyField struct {
+	Name        string `yaml:"name" json:"name"`
+	Type        string `yaml:"type" json:"type"`
+	Required    bool   `yaml:"required" json:"required"`
+	Example     string `yaml:"example,omitempty" json:"example,omitempty"`
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+}
+
 // Body 请求体：none / json / text / form（urlencoded）/ multipart。
 // Raw 为客户端的 json / text 原文，Data 为 Bruno 的 data 字段，两者都保留以免读写第三方集合时丢内容。
-// Descs 为 JSON 体「字段路径 → 备注」，由客户端表格视图维护，随同步往返。
+// Descs 为 JSON 体「字段路径 → 备注」：新数据以 Fields 为准，Descs 只作「首次生成表格」的描述种子，
+// 保留 round-trip 以免读写老文件时丢内容。Fields 为字段表格（唯一真源）。
 type Body struct {
-	Type  string            `yaml:"type" json:"type"`
-	Data  string            `yaml:"data,omitempty" json:"data,omitempty"`
-	Raw   string            `yaml:"raw,omitempty" json:"raw"`
-	Form  []KV              `yaml:"form,omitempty" json:"form"`
-	Descs map[string]string `yaml:"descs,omitempty" json:"descs,omitempty"`
+	Type   string            `yaml:"type" json:"type"`
+	Data   string            `yaml:"data,omitempty" json:"data,omitempty"`
+	Raw    string            `yaml:"raw,omitempty" json:"raw"`
+	Form   []KV              `yaml:"form,omitempty" json:"form"`
+	Descs  map[string]string `yaml:"descs,omitempty" json:"descs,omitempty"`
+	Fields []BodyField       `yaml:"fields,omitempty" json:"fields,omitempty"`
 }
 
 // Auth 认证配置：none | basic | bearer | apikey；值支持 {{变量}}。
