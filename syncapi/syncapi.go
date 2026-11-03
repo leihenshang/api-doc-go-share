@@ -128,9 +128,19 @@ type Payload struct {
 	URL      string `json:"url,omitempty"`
 	GroupUID string `json:"group_uid,omitempty"`
 	Extra    string `json:"extra,omitempty"` // 客户端全量原文 JSON（S11）
+	// ApiStatus 接口生命周期（1=草稿 2=已发布 3=已废弃）。服务端权威：客户端一般不回推，
+	// 键缺失（0）= 不改服务端状态，所以「Web 标废弃、客户端同步」不会把状态抹掉。
+	// 键名带 api_ 前缀：上面的 status 是「响应示例的 HTTP 状态码」，两者语义不同。
+	ApiStatus int `json:"api_status,omitempty"`
+	// Version 业务版本号（可空）；DeprecatedAt 首次废弃时间（RFC3339）。
+	Version      string `json:"version,omitempty"`
+	DeprecatedAt string `json:"deprecated_at,omitempty"`
 	// doc
 	Content string `json:"content,omitempty"`
 	Icon    string `json:"icon,omitempty"`
+	// DocSeq 文档同层排序权重（对应服务端 doc.priority 与客户端 frontmatter 的 seq）。
+	// 键名独立于 example 的 seq：两者语义不同，混用会让示例顺序污染文档顺序。
+	DocSeq int `json:"doc_seq,omitempty"`
 	// example（响应示例）：Name 复用为示例名
 	APIUID      string `json:"api_uid,omitempty"`
 	Sample      string `json:"sample,omitempty"`
@@ -143,6 +153,10 @@ type Payload struct {
 	Value   string `json:"value,omitempty"`
 	Secret  bool   `json:"secret,omitempty"`
 	Enabled *bool  `json:"enabled,omitempty"`
+	// Scope 变量作用域：1=请求级 2=项目级 3=全局（跨项目）。
+	// 全局变量的 project_id=0，既不在项目变更流里、也不在项目快照的按项目取数里，
+	// 故由服务端在每次增量响应里额外附带（见 service/sync.go 的 globalVarItems）。
+	Scope int `json:"scope,omitempty"`
 	// Redacted 为真表示服务端没有下发明文敏感值（调用方无明文权限，审核 H-11）：
 	// 客户端必须保留本地已有值，不得用空值/掩码值覆盖。密文（enc:v1:）始终原样回传。
 	Redacted bool `json:"redacted,omitempty"`

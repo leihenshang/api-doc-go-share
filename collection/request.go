@@ -17,6 +17,12 @@ type FileInfo struct {
 type FileMeta struct {
 	UID     string `yaml:"uid"`
 	BaseRev int64  `yaml:"base_rev"`
+	// Status / Version / DeprecatedAt：服务端侧的生命周期元数据（草稿/已发布/已废弃）。
+	// 客户端只读保留、不回推 —— Web 端是这类状态的唯一权威，两端各改一份必然打架。
+	// 空值不落盘，保证老集合文件字节不变。
+	Status       int    `yaml:"status,omitempty" json:"status,omitempty"`
+	Version      string `yaml:"version,omitempty" json:"version,omitempty"`
+	DeprecatedAt string `yaml:"deprecated_at,omitempty" json:"deprecated_at,omitempty"`
 }
 
 // HTTPBlock 请求文件的 http 段。
