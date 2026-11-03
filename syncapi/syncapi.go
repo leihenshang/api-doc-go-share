@@ -53,6 +53,13 @@ type Meta struct {
 type State struct {
 	Cursor          int64 `json:"cursor"`
 	OldestAvailable int64 `json:"oldest_available"`
+	// GlobalCursor 全局变量（scope=3，project_id=0）的最新变更 id。
+	//
+	// 为什么要单独一个游标：全局变量不属于任何项目，不推进项目游标。客户端若只看 Cursor
+	// 判断「要不要拉」，管理员改了全局变量而项目本身无变更时，就永远拉不到 ——
+	// 表现为同一请求在 Web 与客户端跑出不同结果。客户端应把（Cursor 或 GlobalCursor
+	// 任一前进）作为「需要拉一次增量」的条件（增量响应里会附带全局变量当前值）。
+	GlobalCursor int64 `json:"global_cursor,omitempty"`
 }
 
 // Item 增量/快照里的一条。
