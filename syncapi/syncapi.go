@@ -160,6 +160,10 @@ type Payload struct {
 	Value   string `json:"value,omitempty"`
 	Secret  bool   `json:"secret,omitempty"`
 	Enabled *bool  `json:"enabled,omitempty"`
+	// Defaults 集合级公共请求头/认证（JSON 文本，{"headers":[...],"auth":{...}}）。
+	// 项目级单例、服务端权威：客户端只读落地到本地清单，发送时在「请求未覆盖」时套用。
+	// 空串 = 未设置（客户端据此可清空本地镜像）。
+	Defaults string `json:"defaults,omitempty"`
 	// Scope 变量作用域：1=请求级 2=项目级 3=全局（跨项目）。
 	// 全局变量的 project_id=0，既不在项目变更流里、也不在项目快照的按项目取数里，
 	// 故由服务端在每次增量响应里额外附带（见 service/sync.go 的 globalVarItems）。
